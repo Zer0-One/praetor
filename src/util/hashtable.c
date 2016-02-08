@@ -76,7 +76,7 @@ struct htable* htable_create(size_t size){
     }
     table->bucket_count = size;
     table->load_threshold = .75;
-    logmsg(LOG_DEBUG, "htable %p: new hash table created\n", (void*)&table);
+    logmsg(LOG_DEBUG, "htable %p: new hash table created\n", (void*)table);
     return table;
 }
 
@@ -139,7 +139,7 @@ int htable_data_write(struct htable* table, struct htable_data* entry, void* key
     entry->key = calloc(key_len, sizeof(char));
     if(entry->key == NULL){
         entry->key = 0;
-        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at: %p\n", (void*)&table, key);
+        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at: %p\n", (void*)table, key);
         return -1;
     }
     memcpy(entry->key, key, key_len);
@@ -169,7 +169,7 @@ int htable_add(struct htable* table, void* key, size_t key_len, void* value){
     entry->next = calloc(1, sizeof(struct htable_data));
     if(entry->next == NULL){
         entry->next = 0;
-        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at %p\n", (void*)&table, key);
+        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at %p\n", (void*)table, key);
         return -1;
     }
     if(htable_data_write(table, entry->next, key, key_len, value) == -1){
@@ -183,16 +183,15 @@ int htable_add(struct htable* table, void* key, size_t key_len, void* value){
         table->size = 0;
         table->bucket_count *= 2;
         if(htable_rehash(table) == -1){
-            logmsg(LOG_ERR, "htable %p: could not allocate enough memory for resize/rehash\n", (void*)&table);
+            logmsg(LOG_ERR, "htable %p: could not allocate enough memory for resize/rehash\n", (void*)table);
             table->bucket_count /= 2;
             table->size = tmp_size;
         }
-        logmsg(LOG_DEBUG, "htable %p: table resized and rehashed from %zu to %zu buckets\n", (void*)&table, table->bucket_count/2, table->bucket_count);
+        logmsg(LOG_DEBUG, "htable %p: table resized and rehashed from %zu to %zu buckets\n", (void*)table, table->bucket_count/2, table->bucket_count);
     }
-    logmsg(LOG_DEBUG, "htable %p: added new mapping for key:%p value:%p, table size: %zu\n", (void*)&table, key, value, table->size);
+    logmsg(LOG_DEBUG, "htable %p: added new mapping for key:%p value:%p, table size: %zu\n", (void*)table, key, value, table->size);
     return 0;
 }
-
 
 void htable_destroy(struct htable* table){
     free_buckets(table->bucket_array, table->bucket_count);
@@ -217,11 +216,16 @@ int htable_remove(struct htable* table, void* key, size_t key_len){
     size_t index = (hash(key, key_len) % table->bucket_count);
     struct htable_data* entry = &table->bucket_array[index];
     while(entry != 0){
-        if(entry->key == key){
-            entry->key = 0;
-            entry->key_len = 0;
-            entry->value = 0;
-            return 0;
+        if(key_len == entry->key_len){
+            if(memcmp(entry->key, key, key_len) == 0){
+                free(entry->key);
+                entry->key = 0;
+                entry->key_len = 0;
+                entry->value = 0;
+                table->size--;
+                logmsg(LOG_DEBUG, "htable %p: removed mapping for key:%p value:%p, table size: %zu\n", (void*)table, key, value, table->size);
+                return 0;
+            }
         }
         entry = entry->next;
     }
