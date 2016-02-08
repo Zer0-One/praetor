@@ -5,9 +5,9 @@
 **|** [**Downloads**](https://whereisjenkins.wtf)
 
 An IRC bot designed to be fast, robust, portable, and easily extensible. Unlike
-other bots, praetor is written in C for speed, conforms closely to the SUSv3
-for maximum portability, and uses a nagios-like IPC approach to allow you to
-write plugins in any language you like.
+other bots, praetor is written in C for efficiency, conforms closely to the
+SUSv3 for maximum portability, and uses a Nagios-like IPC approach to allow you
+to write plugins in any language you like.
 
 Information regarding usage can be found in the manual page.
 
@@ -20,9 +20,9 @@ The current to-do list:
 - [ ] Write a plugin system
 - [ ] Create a basic set of fun plugins in different languages, to demonstrate
   user's ability to write plugins in any language they like
-    - [] ddate
-    - [] markov
-    - [] sed
-    - [] acronym
+    - [ ] ddate
+    - [ ] markov
+    - [ ] sed
+    - [ ] acronym
 - [ ] Build a utility to automatically generate plugin acls based on an
   interactive session with the user
