@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
-#include "../log.h"
+#include "log.h"
 
 char rdigit(){
     return (random() % 10) + 48;

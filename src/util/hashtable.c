@@ -10,17 +10,23 @@
 * can be found in the "LICENSE" file bundled with this source distribution.
 */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "hashtable.h"
-#include "../log.h"
+#include "log.h"
 
+/**
+ * A struct representing a hash table entry. An instance of this struct is what
+ * is stored in the "bucket array". When collisions occur, this struct is able
+ * to act as a link in a linked list via its \b next pointer.
+ */
 struct htable_data{
     /**
-     * A pointer to a copy of the user-supplied key for this mapping. The data
-     * pointed to is maintained by the hash table, and not directly modifiable
-     * by the user.
+     * A pointer to a copy of the caller-supplied key for this mapping. The
+     * data pointed to is maintained by the hash table, and not directly
+     * modifiable by the caller.
      */
     void* key;
     /**
@@ -29,7 +35,7 @@ struct htable_data{
     size_t key_len;
     /**
      * A pointer to the value mapped by the stored key. The data pointed to is
-     * user-managed, and not stored or modified by the hash table.
+     * caller-managed, and not stored or modified by the hash table.
      */
     void* value;
     /**
@@ -59,7 +65,7 @@ struct htable{
      * is the number of key-value mappings, and \b k is the number of buckets.
      * If the table exceeds this threshold, it will be automatically doubled in
      * size. This value is set to .75 by default, and may be modified by the
-     * user to change the automatic resizing behavior of the table.
+     * caller to change the automatic resizing behavior of the table.
      */
     double load_threshold;
 };
@@ -198,7 +204,7 @@ void htable_destroy(struct htable* table){
     free(table);
 }
 
-void* htable_lookup(struct htable* table, void* key, size_t key_len){
+void* htable_lookup(const struct htable* table, void* key, size_t key_len){
     size_t index = (hash(key, key_len) % table->bucket_count);
     struct htable_data* entry = &table->bucket_array[index];
     while(entry != 0){
@@ -223,7 +229,7 @@ int htable_remove(struct htable* table, void* key, size_t key_len){
                 entry->key_len = 0;
                 entry->value = 0;
                 table->size--;
-                logmsg(LOG_DEBUG, "htable %p: removed mapping for key:%p value:%p, table size: %zu\n", (void*)table, key, value, table->size);
+                logmsg(LOG_DEBUG, "htable %p: removed mapping for key:%p, table size: %zu\n", (void*)table, key, table->size);
                 return 0;
             }
         }
@@ -232,7 +238,55 @@ int htable_remove(struct htable* table, void* key, size_t key_len){
     return -1;
 }
 
-double htable_get_loadfactor(struct htable* table){
+void htable_key_list_free(struct list* key_list, bool deep){
+    struct list* list_this = key_list;
+    while(list_this != 0){
+        if(deep){
+            free(list_this->key);
+        }
+        struct list* tmp = list_this->next;
+        free(list_this);
+        list_this = tmp;
+    }
+}
+
+struct list* htable_get_keys(const struct htable* table, bool deep){
+    struct list* key_list = calloc(1, sizeof(struct list));
+    struct list* list_this = key_list;
+    if(key_list == NULL){
+        logmsg(LOG_ERR, "htable: could not allocate memory for a new key list\n");
+        return NULL;
+    }
+    for(int i = 0; i < table->bucket_count; i++){
+        struct htable_data* entry = &table->bucket_array[i];
+        while(entry != 0){
+            if(entry->key != 0){
+                list_this->next = calloc(1, sizeof(struct list));
+                list_this = list_this->next;
+                if(list_this->next == NULL){
+                    logmsg(LOG_ERR, "htable %p: could not allocate memory for a new key list\n", (void*)table);
+                    htable_key_list_free(key_list, deep);
+                    return NULL;
+                }
+                if(deep){
+                    list_this->key = calloc(1, entry->key_len);
+                    memcpy(list_this->key, entry->key, entry->key_len);
+                }
+                else{
+                    list_this->key = entry->key;
+                }
+                list_this->size = entry->key_len;
+            }
+            entry = entry->next;
+        }
+    }
+    //The first link was there to make iteration easier, free it now
+    struct list* tmp = key_list->next;
+    free(key_list);
+    return tmp;
+}
+
+double htable_get_loadfactor(const struct htable* table){
     return (double)(table->size) / table->bucket_count;
 }
 
@@ -240,10 +294,10 @@ void htable_set_loadfactor_threshold(struct htable* table, double threshold){
     table->load_threshold = threshold;
 }
 
-size_t htable_get_mapping_count(struct htable* table){
+size_t htable_get_mapping_count(const struct htable* table){
     return table->size;
 }
 
-size_t htable_get_bucket_count(struct htable* table){
+size_t htable_get_bucket_count(const struct htable* table){
     return table->bucket_count;
 }

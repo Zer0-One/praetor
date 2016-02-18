@@ -23,7 +23,7 @@
 #include "config.h"
 #include "daemonize.h"
 #include "log.h"
-#include "util/hashtable.h"
+#include "hashtable.h"
 //#include "sighandlers.h"
 
 /**
@@ -93,9 +93,10 @@ int main(int argc, char* argv[]){
     loadconfig(config_path, &rc_praetor, &rc_network);
     logmsg(LOG_DEBUG, "nick: %s\nalt_nick:%s\n", rc_network.nick, rc_network.alt_nick);
 
+    struct htable* test_table = htable_create(20);
+    htable_add(test_table, "blah", 5, "thisisateststring");
+    
     while(true){
-        struct htable* test_table = htable_create(20);
-        htable_add(test_table, "blah", 5, "thisisateststring");
         logmsg(LOG_DEBUG, "The lookup gave us: %s\n", (char*)htable_lookup(test_table, "blah", 5));
         sleep(1);
     }

@@ -31,43 +31,45 @@ Enables debug mode. Logging verbosity will be increased.
 Enables foreground mode. The daemon will log to \fBstdout\fR instead of to the syslog.
 
 .SH CONFIGURATION OVERVIEW
-praetor's main configuration file is layed out into a series of sections,
-delimited by curly-brackets, all containing either key-value pairs, or other
-sections. A key and value are seperated by an '\fB=\fR' sign, with any amount
-of whitespace before, after, or in-between. Semicolons delimit the key-value
-pairs, so no semicolon can be included as part of a key or value.
+praetor's configuration file is a JSON document. The root object contains a
+\fBdaemon\fR object for configuration options related to praetor as a daemon,
+and a \fBnetworks\fR array containing objects that describe configuration on a
+per-network basis. A JSON schema that can be used to externally validate the
+configuration is stored at \fI/usr/share/doc/praetor/praetor.conf.schema\fR .
 
-Where filesystem paths are specified as the value, paths beginning with a
-forward slash are interpreted to be absolute, and paths without the leading
+Where filesystem paths are specified as a value, paths beginning with a forward
+slash are interpreted to be absolute, and paths without the leading
 forward-slash are interpreted to be relative to the daemon's working directory.
 
-For more information about the configuration file syntax, read preator's
-example configs in \fB/usr/share/doc/praetor\fR
+For more information about the configuration file syntax, read praetor's
+example configs in \fI/usr/share/doc/praetor\fR.
+
+The following sections list and briefly describe each configuration directive.
 
 .SH DAEMON CONFIGURATION
-The following is a list of configuration options pertaining to the daemon
-itself.
+The following is a list of configuration options pertaining to praetor's
+operation as a daemon.
 
 .TP 8
 .B user
 
-praetor starts as the root user, but drops its user privileges to that of the
-specified user. The given username or uid must belong to a valid system user
-account.
+praetor's user is initially root, but it drops its user privileges to that of
+the specified user. The given username or uid must belong to a valid system
+user account.
 
 .HP
 .B group
 
-praetor starts in the root group, but drops its group privileges to that of the
-specified group. The given groupname or gid must belong to a valid system group
-account.
+praetor's group is initially root, but it drops its group privileges to that of
+the specified group. The given groupname or gid must belong to a valid system
+group account.
 
 .HP
 .B workdir
 
 A path to the daemon's working directory. The directory must be writeable by
 the user or group specified with the \fBuser\fR or \fBgroup\fR options. All
-files that the daemon needs to create in order to function are saved here.
+files that the daemon needs to create at runtime are saved here.
 
 .HP
 .B plugins
@@ -75,20 +77,29 @@ files that the daemon needs to create in order to function are saved here.
 A path to the directory containing plugins to be loaded.
 
 .SH NETWORK CONFIGURATION
-The following is a list of options that apply to each irc network section of
+The following is a list of options that apply to each IRC network object of
 the configuration.
 
 .TP 8
+.B name
+
+The name that praetor will use to identify this IRC network in its logs,
+command interface, etc.. The \fBname\fR for any two IRC networks must not be
+the same. \fBname\fR must be unique.
+
+.HP
 .B host
 
-The fully qualified domain name of the irc server to connect to. praetor will
+The fully-qualified domain name of the IRC server to connect to. praetor will
 connect over port 6667 by default, but you may specify a port number by
-appending a semicolon after the domain name.
+appending a colon followed by a port number.
+.br
+(e.g chat.example.net:6697).
 
 .HP
 .B ssl
 
-If set to \fBenabled\fR, praetor will attempt to connect using SSL. By default,
+If set to \fItrue\fR, praetor will attempt to connect using SSL. By default,
 ssl is disabled.
 
 .HP
@@ -116,30 +127,79 @@ The IRC realname that praetor will use. For more information, see RFC1459.
 .HP
 .B channels
 
-A comma-seperated list of channels that praetor will join upon connecting to
-the network.
+A list of channels that praetor will join upon connecting to the network.
+
+.HP
+.B admins
+
+A list of IRC nicknames of users who have administrative privileges over
+praetor.
+
+.HP
+.B plugins
+
+An array of objects describing how praetor should treat individual plugins with
+respect to this network. Options for these objects are described below.
+
+.SH PLUGIN CONFIGURATION
+The following options are valid within a \fBplugins\fR object.
+
+.TP 8
+.B name
+
+The name of the plugin to apply this configuration to. This name should match
+the name that the plugin registers with praetor. Plugin registration is
+described in the section \fBWRITING AND RUNNING PLUGINS\fR.
+
+.HP
+.B input
+
+A list of channels that this plugin will receive input from. If \fBinput\fR is
+omitted, this plugin will receive input from all channels that praetor is
+joined to. If \fBinput\fR is included but left blank, this plugin will not
+receive input from any channels.
+
+.HP
+.B output
+
+A list of channels that this plugin will be allowed to send output to. If
+\fBoutput\fR is omitted, this plugin will be allowed to send output to any
+channel. If \fBoutput\fR is included but left blank, this plugin will not be
+allowed to send output to any channel.
+
+.HP
+.B private_messages
+
+If set to \fItrue\fR, this plugin will receive private messages, and be allowed
+to send private messages.
+
+.HP
+.B rate_limit
+
+A value, in seconds, that determines how long this plugin will have to wait
+between sending each message. If omitted, or if the value is set to 0 or null,
+this plugin will not be rate-limited.
 
 .SH WRITING AND RUNNING PLUGINS
 .HP 8
 .B Overview
 
 Plugins for praetor may be written in any language. This is possible because
-praetor communicates with plugins via a named pipe. The plugin manager process
-hooks file descriptors 1 and 2 up to FIFOs, and when plugins are forked, they
-inherit these descriptors. This makes writing plugins easy, since all a user
-has to do is write to stdout and read from stdin, as if they were interacting
-with a terminal.
+praetor communicates with plugins via pipes. Before forking a plugin, praetor
+hooks file descriptors 1 and 2 up to newly-created pipes; plugins then inherit
+these descriptors. This makes writing plugins easy, since all a user has to do
+is write to stdout and read from stdin, as if they were interacting with a
+terminal.
 
 .HP 8
 .B Registering A Plugin
 
-In order for praetor to apply an ACL to a given plugin, and in order for
-praetor to be able to accurately report information about the plugins it is
+In order for praetor to apply any configuration to a given plugin, and in order
+for praetor to be able to accurately report information about the plugins it is
 running, you must register a plugin with praetor before the plugin can be used.
-This is done (like all other communication with the daemon) by writing a
-special string, ending with a newline character, to stdout. To successfully
-register a plugin, the following string must be the \fBfirst\fR output that
-your plugin provides:
+This is done by writing a special string, ending with a newline character, to
+stdout. To successfully register a plugin, the following string must be the
+very first output that your plugin provides:
 
 \fBName\fR=\fIplugin_name\fR,\fBVersion\fR=\fIplugin_version\fR,\fBDescription\fR=\fIplugin_description\fR
 

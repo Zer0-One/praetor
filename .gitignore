@@ -2,3 +2,4 @@ bin/
 doc/
 
 *.swp
+test_runner.c

@@ -1,0 +1,61 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "praetor-config",
+    "description": "praetor's configuration file",
+    "type": "object",
+    "properties": {
+        "daemon": {
+            "type": "object",
+            "properties": {
+                "user": {"type": "string"},
+                "group": {"type": "string"},
+                "workdir": {"type": "string"},
+                "plugins": {"type": "string"}
+            },
+            "required": ["user","group","workdir","plugins"]
+        },
+        "networks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "host": {"type": "string"},
+                    "ssl": {"type": "boolean"},
+                    "nick": {"type": "string"},
+                    "alt_nick": {"type": "string"},
+                    "user": {"type": "string"},
+                    "real_name": {"type": "string"},
+                    "channels": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "admins": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "plugins": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "input": {
+                                    "type": "array",
+                                    "items": {"type": "string"}
+                                },
+                                "output": {
+                                    "type": "array",
+                                    "items": {"type": "string"}
+                                },
+                                "private_messages": {"type": "boolean"},
+                                "rate_limit": {"type": "integer"}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "required": ["daemon", "networks"]
+}

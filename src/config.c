@@ -19,7 +19,7 @@
 #include <unistd.h>
 #include "config.h"
 #include "log.h"
-#include "util/hashtable.h"
+#include "hashtable.h"
 
 void initconfig(struct praetorinfo* rc_praetor){
     rc_praetor->user = "praetor";
@@ -42,7 +42,7 @@ void loadconfig(char* path, struct praetorinfo* rc_praetor, struct networkinfo* 
     json_t* daemon_section = NULL, *networks_section = NULL, *plugins_section = NULL;
     
     //Unpack and validate root object
-    if(json_unpack_ex(root, &error, JSON_STRICT, "{s?O, s?O, s?O}", "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
+    if(json_unpack_ex(root, &error, JSON_STRICT, "{s?O, s?O}", "daemon", &daemon_section, "networks", &networks_section)){
         logmsg(LOG_ERR, "Configuration: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
         _exit(-1);
     }
@@ -67,7 +67,7 @@ void loadconfig(char* path, struct praetorinfo* rc_praetor, struct networkinfo* 
         _exit(-1);
     }
     else{
-        json_t* value, *channels, *admins;
+        json_t* value, *channels, *admins, *plugins;
         size_t index;
         struct networkinfo* rc_networks_this = rc_networks;
         json_array_foreach(networks_section, index, value){
