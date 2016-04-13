@@ -9,20 +9,23 @@ test_sources = test/*.c test/unity/src/*.c
 commit_hash='"$(shell git log -n 1 --pretty=format:%H)"'
 praetor_version='"$(shell cat VERSION)"'
 
-.PHONY: all all-debug docs test clean
+.PHONY: all all-debug deps docs test clean
 
 praetor: bin/praetor
 praetor-debug: bin/praetor_debug
 
-bin/praetor: src/*.c src/util/*.c
+bin/praetor: src/*.c src/util/*.c include/*.h
 		-mkdir bin
-		$(cc) -O2 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -I include/ -ljansson $+ -o $@
+		$(cc) -O2 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
 		chmod +x bin/praetor
 
-bin/praetor_debug: src/*.c src/util/*.c
+bin/praetor_debug: src/*.c src/util/*.c include/*.h
 		-mkdir bin
-		$(cc) -g -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -I include/ -ljansson $+ -o $@
+		$(cc) -g -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
 		chmod +x bin/praetor_debug
+
+deps:
+		cd deps/libressl/ && ./autogen.sh && ./configure && make -j4 check && sudo make install
 
 test:
 		chmod +x test/unity/auto/*
@@ -32,7 +35,7 @@ test:
 		./test/test_runner
 
 docs :
-		mkdir doc
+		-mkdir doc
 		doxygen Doxyfile
 
 clean : 

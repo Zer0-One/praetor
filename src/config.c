@@ -17,9 +17,14 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
 #include "config.h"
 #include "log.h"
 #include "hashtable.h"
+
+struct praetorinfo* rc_praetor;
+struct htable* rc_network;
+struct htable* rc_network_sock;
 
 void initconfig(struct praetorinfo* rc_praetor){
     rc_praetor->user = "praetor";
@@ -28,7 +33,7 @@ void initconfig(struct praetorinfo* rc_praetor){
     rc_praetor->plugin_path = "/usr/share/praetor/plugins";
 }
 
-void loadconfig(char* path, struct praetorinfo* rc_praetor, struct networkinfo* rc_networks){
+void loadconfig(char* path){
     srandom(time(NULL));
     json_error_t error;
     json_t* root = json_load_file(path, 0, &error);
@@ -67,20 +72,19 @@ void loadconfig(char* path, struct praetorinfo* rc_praetor, struct networkinfo* 
         _exit(-1);
     }
     else{
+        struct networkinfo* networkinfo_this = calloc(1, sizeof(struct networkinfo));
+        char* name;
+        size_t name_len;
+
         json_t* value, *channels, *admins, *plugins;
         size_t index;
-        struct networkinfo* rc_networks_this = rc_networks;
         json_array_foreach(networks_section, index, value){
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s?O, s?O}", "name", &rc_networks_this->name, "host", &rc_networks_this->host, "ssl", &rc_networks_this->ssl, "nick", &rc_networks_this->nick, "alt_nick", &rc_networks_this->alt_nick, "user", &rc_networks_this->user, "real_name", &rc_networks_this->real_name, "channels", &channels, "admins", &admins) == -1){
+            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s%, s:s, s?b, s:s, s:s, s:s, s:s, s?O, s?O, s?O}", "name", &name, &name_len, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
                 logmsg(LOG_ERR, "Configuration: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 _exit(-1);
             }
-            if(index == (json_array_size(networks_section) - 1)){
-                rc_networks_this->next = NULL;
-                break;
-            }
-            rc_networks_this->next = malloc(sizeof(struct networkinfo));
-            rc_networks_this = rc_networks_this->next;
+            htable_add(rc_network, name, name_len, networkinfo_this);
+            logmsg(LOG_DEBUG, "Configuration: added configuration for network %s:%zd\n", name, name_len);
         }
     }
 

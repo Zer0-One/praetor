@@ -1,6 +1,6 @@
 .\" Manual page for praetor
 
-.TH praetor 1 "26 May 2015" "1.0" "praetor Manual Page"
+.TH praetor 1 "26 May 2015" "praetor 0.1.0" "praetor Manual Page"
 
 .SH NAME
 praetor - a free and open source IRC bot designed to be robust, portable, and
@@ -30,7 +30,8 @@ Enables debug mode. Logging verbosity will be increased.
 .B -f
 Enables foreground mode. The daemon will log to \fBstdout\fR instead of to the syslog.
 
-.SH CONFIGURATION OVERVIEW
+.SH CONFIGURATION
+.SS Overview
 praetor's configuration file is a JSON document. The root object contains a
 \fBdaemon\fR object for configuration options related to praetor as a daemon,
 and a \fBnetworks\fR array containing objects that describe configuration on a
@@ -46,144 +47,130 @@ example configs in \fI/usr/share/doc/praetor\fR.
 
 The following sections list and briefly describe each configuration directive.
 
-.SH DAEMON CONFIGURATION
+.SS File Permissions
+If the user expects to be able to manage praetor's configuration via IRC,
+praetor must be able to write to its configuration file; ensure that the
+file-system permissions on the configuration file allow writes from the user
+account that praetor will be running under.
+
+.SS Daemon Configuration
+
 The following is a list of configuration options pertaining to praetor's
 operation as a daemon.
 
-.TP 8
+.TP 10
 .B user
-
 praetor's user is initially root, but it drops its user privileges to that of
 the specified user. The given username or uid must belong to a valid system
 user account.
 
-.HP
+.TP
 .B group
-
 praetor's group is initially root, but it drops its group privileges to that of
 the specified group. The given groupname or gid must belong to a valid system
 group account.
 
-.HP
+.TP
 .B workdir
-
 A path to the daemon's working directory. The directory must be writeable by
 the user or group specified with the \fBuser\fR or \fBgroup\fR options. All
 files that the daemon needs to create at runtime are saved here.
 
-.HP
+.TP
 .B plugins
-
 A path to the directory containing plugins to be loaded.
 
-.SH NETWORK CONFIGURATION
+.SS Network Configuration
 The following is a list of options that apply to each IRC network object of
 the configuration.
 
-.TP 8
+.TP 10
 .B name
-
 The name that praetor will use to identify this IRC network in its logs,
 command interface, etc.. The \fBname\fR for any two IRC networks must not be
 the same. \fBname\fR must be unique.
 
-.HP
+.TP
 .B host
-
 The fully-qualified domain name of the IRC server to connect to. praetor will
 connect over port 6667 by default, but you may specify a port number by
 appending a colon followed by a port number.
 .br
 (e.g chat.example.net:6697).
 
-.HP
+.TP
 .B ssl
-
 If set to \fItrue\fR, praetor will attempt to connect using SSL. By default,
 ssl is disabled.
 
-.HP
+.TP
 .B nick
-
 The nickname that praetor will attempt to use upon connecting.
 
-.HP
+.TP
 .B alt_nick
-
 The nickname that praetor will attempt to use if \fBnick\fR is already in use,
 or otherwise not available. You may include question marks, each of which will
 be converted into a random single-digit number.
 
-.HP
+.TP
 .B user
-
 The IRC username that praetor will use. For more information, see RFC1459.
 
-.HP
+.TP
 .B realname
-
 The IRC realname that praetor will use. For more information, see RFC1459.
 
-.HP
+.TP
 .B channels
-
 A list of channels that praetor will join upon connecting to the network.
 
-.HP
+.TP
 .B admins
-
 A list of IRC nicknames of users who have administrative privileges over
 praetor.
 
-.HP
+.TP
 .B plugins
-
 An array of objects describing how praetor should treat individual plugins with
 respect to this network. Options for these objects are described below.
 
-.SH PLUGIN CONFIGURATION
+.SS Plugin Configuration
 The following options are valid within a \fBplugins\fR object.
 
-.TP 8
+.TP 10
 .B name
-
 The name of the plugin to apply this configuration to. This name should match
 the name that the plugin registers with praetor. Plugin registration is
 described in the section \fBWRITING AND RUNNING PLUGINS\fR.
 
-.HP
+.TP
 .B input
-
 A list of channels that this plugin will receive input from. If \fBinput\fR is
 omitted, this plugin will receive input from all channels that praetor is
 joined to. If \fBinput\fR is included but left blank, this plugin will not
 receive input from any channels.
 
-.HP
+.TP
 .B output
-
 A list of channels that this plugin will be allowed to send output to. If
 \fBoutput\fR is omitted, this plugin will be allowed to send output to any
 channel. If \fBoutput\fR is included but left blank, this plugin will not be
 allowed to send output to any channel.
 
-.HP
+.TP
 .B private_messages
-
 If set to \fItrue\fR, this plugin will receive private messages, and be allowed
 to send private messages.
 
-.HP
+.TP
 .B rate_limit
-
 A value, in seconds, that determines how long this plugin will have to wait
 between sending each message. If omitted, or if the value is set to 0 or null,
 this plugin will not be rate-limited.
 
 .SH WRITING AND RUNNING PLUGINS
-.HP 8
-.B Overview
-
+.SS Overview
 Plugins for praetor may be written in any language. This is possible because
 praetor communicates with plugins via pipes. Before forking a plugin, praetor
 hooks file descriptors 1 and 2 up to newly-created pipes; plugins then inherit
@@ -191,9 +178,7 @@ these descriptors. This makes writing plugins easy, since all a user has to do
 is write to stdout and read from stdin, as if they were interacting with a
 terminal.
 
-.HP 8
-.B Registering A Plugin
-
+.SS Registering A Plugin
 In order for praetor to apply any configuration to a given plugin, and in order
 for praetor to be able to accurately report information about the plugins it is
 running, you must register a plugin with praetor before the plugin can be used.
@@ -206,9 +191,7 @@ very first output that your plugin provides:
 Fill out the values accordingly, and ensure that each option is comma-seperated
 and that there are no newlines in any of the values.
 
-.HP
-.B Plugin ACLs
-
+.SS Plugin ACLs
 It is possible to control which channels plugins have access to by means of an
 access control list (ACL).  By default, all plugins may write output to all
 channels. Once a section for a particular network is added to the ACL, no
@@ -220,9 +203,8 @@ key-value pairs, where the key is the channel name, and the value is a
 comma-seperated list of plugins which will be allowed to access that channel.
 
 .SH NOTES
-.HP 8
-.B sdfsdf
-
+.SS sdfsdf
 This is the paragraph about the thing
+
 .SH AUTHORS
 Copyright © 2015 David Zero

@@ -1,8 +1,8 @@
 # praetor
 
-[**Building**](https://github.com/Zer0-One/praetor#Building)
-**|** [**Reporting Bugs**](https://github.com/Zer0-One/praetor/wiki/Writing-Useful-Bug-Reports)
-**|** [**Downloads**](https://whereisjenkins.wtf)
+[Building](https://github.com/Zer0-One/praetor#Building)
+| [Reporting Bugs](https://github.com/Zer0-One/praetor/wiki/Writing-Useful-Bug-Reports)
+| [Downloads](https://whereisjenkins.wtf)
 
 An IRC bot designed to be fast, robust, portable, and easily extensible. Unlike
 other bots, praetor is written in C for efficiency, conforms closely to the
@@ -16,7 +16,10 @@ Information regarding usage can be found in the manual page.
 ### Dependencies
 
 Before building praetor, you will need to have installed
-[`libjansson`](https://github.com/akheron/jansson) and its headers.
+[`libjansson`](https://github.com/akheron/jansson) and
+[`libressl`](https://github.com/libressl-portable/portable), as well as their
+headers. If you don't have them, you may run `make deps` to build and install
+them.
 
 ### Compiling
 
@@ -27,6 +30,7 @@ Makefile targets         | Description
 ------------------------ | ---------------------------------------------------------
 `make` or `make praetor` | Builds praetor
 `make praetor-debug`     | Builds a debug version of praetor
+`make deps`              | Downloads and builds dependencies
 `make docs`              | Generates API documentation
 `make test`              | Builds and runs unit tests
 `make clean`             | Deletes generated binaries, documentation, and unit tests
@@ -41,6 +45,7 @@ No packages yet.
 
 The current to-do list:
 
+- [ ] Implement praetor as a daemon, complete with init scripts for OpenRC, systemd, etc.
 - [ ] Implement a unit testing framework
 - [ ] Create a JSON config file format, parse it into usable structures
 - [ ] Implement IRC client functionality

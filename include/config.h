@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015,2016 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -14,6 +14,24 @@
 #define PRAETOR_CONFIG
 
 #include <stdbool.h>
+#include <tls.h>
+#include "hashtable.h"
+
+/**
+ * A reference to the global hash table containing praetor's daemon-specific
+ * configuration.
+ */
+extern struct praetorinfo* rc_praetor;
+/**
+ * A reference to the global hash table containing praetor's network-specific
+ * configuration, indexed by the user-specified name of the network.
+ */
+extern struct htable* rc_network;
+/**
+ * A reference to the global hash table containing praetor's network-specific
+ * configuration, indexed by socket file descriptor.
+ */
+extern struct htable* rc_network_sock;
 
 /**
  * Contains the configuration options required for praetor to function as a
@@ -73,23 +91,47 @@ struct admin{
 };
 
 /**
- * A linked list that contains configuration options for connections to a set
- * of IRC networks.
+ * This struct represents the configuration of a plugin for a particular IRC
+ * network.
+ */
+struct plugin{
+    /**
+     * A handle for this plugin.
+     */
+    char* name;
+    /**
+     * If set to true, this plugin will be allowed to send and receive private
+     * messages.
+     */
+    bool private_messages;
+    /**
+     * The number of milliseconds that this plugin will be required to wait
+     * before sending another message. If the plugin sends messages at a rate
+     * that exceed this limit, the messages will be queued and sent one-by-one
+     * as the rate_limit timer cycles.
+     */
+    int rate_limit;
+    /**
+     * A linked list of channels that this plugin will be allowed to receive
+     * input from.
+     */
+    struct channelinfo* input;
+    /**
+     * A linked list of channels that this plugin will be allowed to send
+     * output to.
+     */
+    struct channelinfo* output;
+};
+
+/**
+ * A struct that contains configuration options for connections to an IRC
+ * network.
  */
 struct networkinfo{
     /**
-     * The preferred name for the network. This label is arbitrary, and is used
-     * to match plugin acls to their respective networks.
-     */
-    const char* name;
-    /**
-     * The DNS name or IP address of the IRC server to connect to.
+     * The DNS name or IP address and TCP port of the IRC server to connect to.
      */
     const char* host;
-    /**
-     * The TCP port to connect to.
-     */
-    const char* port;
     /**
      * If this is set to true, praetor will attempt to connect using SSL/TLS.
      */
@@ -123,7 +165,7 @@ struct networkinfo{
     const char* real_name;
     /**
      * A linked list containing the names of the channels on this network that
-     * praetor will join upon establishing/registering a connection.
+     * praetor will join upon registering a connection.
      */
     struct channel* channels;
     /**
@@ -132,14 +174,18 @@ struct networkinfo{
      */
     struct admin* admins;
     /**
+     * A hash table containing plugin configuration for this network. This hash
+     * table maps plugin handles to plugin structs.
+     */
+    struct htable* plugins;
+    /**
      * A socket file descriptor for the connection to this IRC server.
      */
     int sock;
     /**
-     * A pointer to the next networkinfo struct. This variable will be NULL if
-     * this is the last networkinfo struct in the list.
+     * A libtls connection context.
      */
-    struct networkinfo* next;
+    struct tls* ctx;
 };
 
 /**
@@ -152,10 +198,10 @@ struct networkinfo{
  * @param path The path to the main configuration file.
  * @param[out] rc_praetor A pointer to the struct in which praetor's main
  * configuration options are stored.
- * @param[out] rc_networks A pointer to a linked list of structs (one for each
- * network specified in the config) containing network-specific configuration
+ * @param[out] rc_network A pointer to a hash table that maps network names to
+ * networkinfo structs.
  * options.
  */
-void loadconfig(char* path, struct praetorinfo* rc_praetor, struct networkinfo* rc_networks);
+void loadconfig(char* path);
 
 #endif

@@ -34,7 +34,7 @@ void print_usage(){
     printf("\nCommand-line options:\n");
     printf("\n\t-c,\tSpecifies praetor's main configuration file path");
     printf("\n\t-d,\tEnables debug mode, increasing logging verbosity");
-    printf("\n\t-f,\tEnables foreground mode. praetor will log to stdout");
+    printf("\n\t-f,\tEnables foreground mode. praetor will run in the foreground, and log to stdout");
     printf("\n\t-h,\tPrints this help information");
     printf("\n\t-v,\tPrints version information\n\n");
 }
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]){
                 printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
                 printf("This build of praetor has been compiled with support for:\n");
                 printf("Jansson Version: %s\n", JANSSON_VERSION);
-                printf("OpenSSL Version: %s\n\n", OPENSSL_VERSION_TEXT);
+                printf("LibreSSL Version: %s\n\n", LIBRESSL_VERSION_TEXT);
                 _exit(0);
             case '?':
                 print_usage();
@@ -86,18 +86,16 @@ int main(int argc, char* argv[]){
         print_usage();
         _exit(-1);
     }
-
     logmsg(LOG_DEBUG, "Config file path = %s\n", config_path);
-    struct praetorinfo rc_praetor;
-    struct networkinfo rc_network = {.next = NULL};
-    loadconfig(config_path, &rc_praetor, &rc_network);
-    logmsg(LOG_DEBUG, "nick: %s\nalt_nick:%s\n", rc_network.nick, rc_network.alt_nick);
 
-    struct htable* test_table = htable_create(20);
-    htable_add(test_table, "blah", 5, "thisisateststring");
-    
+    //allocate space for various configuration
+    rc_praetor = calloc(1, sizeof(struct praetorinfo));
+    rc_network = htable_create(10);
+    rc_network_sock = htable_create(10);
+
+    loadconfig(config_path);
+
     while(true){
-        logmsg(LOG_DEBUG, "The lookup gave us: %s\n", (char*)htable_lookup(test_table, "blah", 5));
         sleep(1);
     }
 }

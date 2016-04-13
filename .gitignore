@@ -2,4 +2,6 @@ bin/
 doc/
 
 *.swp
+.clang_complete
 test_runner.c
+test_runner

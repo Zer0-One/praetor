@@ -61,11 +61,12 @@ struct htable{
      */
     size_t bucket_count;
     /** 
-     * The maximum load factor of the hash table, given by \b (n/k), where \b n
-     * is the number of key-value mappings, and \b k is the number of buckets.
-     * If the table exceeds this threshold, it will be automatically doubled in
-     * size. This value is set to .75 by default, and may be modified by the
-     * caller to change the automatic resizing behavior of the table.
+     * The maximum load factor of the hash table, given by \f$(n/k)\f$, where
+     * \f$n\f$ is the number of key-value mappings, and \f$k\f$ is the number
+     * of buckets.  If the table exceeds this threshold, it will be
+     * automatically doubled in size. This value is set to .75 by default, and
+     * may be modified by the caller to change the automatic resizing behavior
+     * of the table.
      */
     double load_threshold;
 };
@@ -89,7 +90,7 @@ struct htable* htable_create(size_t size){
 /**
  * An implementation of Bob Jenkins's one-at-a-time hash function
  */
-uint32_t hash(char* key, size_t len){
+uint32_t hash(const char* key, size_t len){
     uint32_t hash, i;
     for(hash = i = 0; i < len; ++i){
         hash += key[i];
@@ -141,7 +142,7 @@ int htable_rehash(struct htable* table){
     return 0;
 }
 
-int htable_data_write(struct htable* table, struct htable_data* entry, void* key, size_t key_len, void* value){
+int htable_data_write(struct htable* table, struct htable_data* entry, const void* key, size_t key_len, void* value){
     entry->key = calloc(key_len, sizeof(char));
     if(entry->key == NULL){
         entry->key = 0;
@@ -154,7 +155,7 @@ int htable_data_write(struct htable* table, struct htable_data* entry, void* key
     return 0;
 }
 
-int htable_add(struct htable* table, void* key, size_t key_len, void* value){
+int htable_add(struct htable* table, const void* key, size_t key_len, void* value){
     size_t index = (hash(key, key_len) % table->bucket_count);
     if(htable_lookup(table, key, key_len) != NULL){
         return 1;
@@ -204,7 +205,7 @@ void htable_destroy(struct htable* table){
     free(table);
 }
 
-void* htable_lookup(const struct htable* table, void* key, size_t key_len){
+void* htable_lookup(const struct htable* table, const void* key, size_t key_len){
     size_t index = (hash(key, key_len) % table->bucket_count);
     struct htable_data* entry = &table->bucket_array[index];
     while(entry != 0){
@@ -218,7 +219,7 @@ void* htable_lookup(const struct htable* table, void* key, size_t key_len){
     return NULL;
 }
 
-int htable_remove(struct htable* table, void* key, size_t key_len){
+int htable_remove(struct htable* table, const void* key, size_t key_len){
     size_t index = (hash(key, key_len) % table->bucket_count);
     struct htable_data* entry = &table->bucket_array[index];
     while(entry != 0){
