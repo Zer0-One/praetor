@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015,2016 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -255,22 +255,22 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
     struct list* key_list = calloc(1, sizeof(struct list));
     struct list* list_this = key_list;
     if(key_list == NULL){
-        logmsg(LOG_ERR, "htable: could not allocate memory for a new key list\n");
+        logmsg(LOG_ERR, "htable %p: Could not allocate memory for a new key list\n", (void*)table);
         return NULL;
     }
     for(int i = 0; i < table->bucket_count; i++){
-        struct htable_data* entry = &table->bucket_array[i];
-        while(entry != 0){
+        for(struct htable_data* entry = &table->bucket_array[i]; entry != 0; entry = entry->next){
             if(entry->key != 0){
                 list_this->next = calloc(1, sizeof(struct list));
                 list_this = list_this->next;
-                if(list_this->next == NULL){
-                    logmsg(LOG_ERR, "htable %p: could not allocate memory for a new key list\n", (void*)table);
-                    htable_key_list_free(key_list, deep);
-                    return NULL;
+                if(list_this == NULL){
+                    goto fail;
                 }
                 if(deep){
                     list_this->key = calloc(1, entry->key_len);
+                    if(list_this->key == NULL){
+                        goto fail;
+                    }
                     memcpy(list_this->key, entry->key, entry->key_len);
                 }
                 else{
@@ -278,13 +278,19 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
                 }
                 list_this->size = entry->key_len;
             }
-            entry = entry->next;
         }
     }
     //The first link was there to make iteration easier, free it now
     struct list* tmp = key_list->next;
     free(key_list);
     return tmp;
+
+    fail:
+        logmsg(LOG_ERR, "htable %p: Could not allocate memory for a new key list\n", (void*)table);
+        struct list* temp = key_list->next;
+        free(key_list);
+        htable_key_list_free(temp, deep);
+        return NULL;
 }
 
 double htable_get_loadfactor(const struct htable* table){

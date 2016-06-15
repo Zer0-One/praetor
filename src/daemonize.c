@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015,2016 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "log.h"
 
 /**
@@ -27,8 +28,8 @@
  */
 const int FD_ULIMIT = 9001;
 
-void daemonize(char* dir, char* user, char* group){
-	//fetch user and group info
+void daemonize(const char* workdir, const char* user, const char* group){
+    //fetch user and group info
 	errno = 0;
 	struct passwd* usr = getpwnam(user);
 	if(usr == NULL){
@@ -37,19 +38,19 @@ void daemonize(char* dir, char* user, char* group){
 	}
 	errno = 0;
 	struct group* grp = getgrnam(group);
-	if(setgid(grp->gr_gid) == -1){
+	if(grp == NULL){
 		logmsg(LOG_ERR, "Failed to get gid for group: '%s'. %s", group, strerror(errno));
 		_exit(-1);
 	}
     //permanently drop privs
-	if(setuid(usr->pw_uid) == -1){
-		logmsg(LOG_ERR, "Failed to set user to: '%s'. %s", user, strerror(errno));
-		_exit(-1);
-	}
     if(setgid(grp->gr_gid) == -1){
         logmsg(LOG_ERR, "Failed to set group to: '%s'. %s", group, strerror(errno));
         _exit(-1);
     }
+	if(setuid(usr->pw_uid) == -1){
+		logmsg(LOG_ERR, "Failed to set user to: '%s'. %s", user, strerror(errno));
+		_exit(-1);
+	}
 
 	switch(fork()){
 		case -1:
@@ -79,8 +80,8 @@ void daemonize(char* dir, char* user, char* group){
 
 	umask(S_IWGRP | S_IWOTH);
 
-	if(chdir(dir) == -1){
-		logmsg(LOG_ERR, "Failed to change directory to %s. %s", dir, strerror(errno));
+	if(chdir(workdir) == -1){
+		logmsg(LOG_ERR, "Failed to change directory to %s. %s", workdir, strerror(errno));
 		_exit(-1);
 	}
 

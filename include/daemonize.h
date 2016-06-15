@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015,2016 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -16,10 +16,10 @@
 /**
  * Turns the calling process into a daemon.
  *
- * \param dir The directory that will be used as the daemon's working directory
+ * \param workdir The directory that will be used as the daemon's working directory
  * \param user The user with whose privileges the daemon will run
  * \param group The group with whose privileges the daemon will run
  */
-void daemonize(char* dir, char* user, char* group);
+void daemonize(const char* workdir, const char* user, const char* group);
 
 #endif

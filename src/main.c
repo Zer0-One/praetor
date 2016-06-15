@@ -1,8 +1,8 @@
-/*
+/**
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015,2016 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -22,8 +22,10 @@
 #include <unistd.h>
 #include "config.h"
 #include "daemonize.h"
-#include "log.h"
 #include "hashtable.h"
+#include "irc.h"
+#include "log.h"
+#include "nexus.h"
 //#include "sighandlers.h"
 
 /**
@@ -70,7 +72,7 @@ int main(int argc, char* argv[]){
                 print_usage();
                 _exit(0);
             case 'v':
-                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
+                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015,2016 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
                 printf("This build of praetor has been compiled with support for:\n");
                 printf("Jansson Version: %s\n", JANSSON_VERSION);
                 printf("LibreSSL Version: %s\n\n", LIBRESSL_VERSION_TEXT);
@@ -89,13 +91,29 @@ int main(int argc, char* argv[]){
     logmsg(LOG_DEBUG, "Config file path = %s\n", config_path);
 
     //allocate space for various configuration
-    rc_praetor = calloc(1, sizeof(struct praetorinfo));
-    rc_network = htable_create(10);
-    rc_network_sock = htable_create(10);
+    if((rc_praetor = calloc(1, sizeof(struct praetorinfo))) == NULL){
+        logmsg(LOG_ERR, "main: cannot allocate memory for daemon configuration\n");
+        _exit(-1);
+    }
+    rc_network = htable_create(5);
+    rc_network_sock = htable_create(5);
 
+    //load configuration
     loadconfig(config_path);
 
-    while(true){
-        sleep(1);
+    //daemonize
+    if(!foreground){
+        daemonize(rc_praetor->workdir, rc_praetor->user, rc_praetor->group);
     }
+
+    //connect to IRC
+    struct list* networks = htable_get_keys(rc_network, false);
+    for(struct list* this = networks; this != 0; this = this->next){
+        if(irc_connect(this->key) != -1){
+            struct networkinfo* n = htable_lookup(rc_network, this->key, this->size);
+            watch_add(n->sock);
+        }
+    }
+
+    run();
 }

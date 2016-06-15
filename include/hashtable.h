@@ -39,7 +39,7 @@ struct list{
      */
     size_t size;
     /**
-     * A pointer to the next link in the linked list. If this is the last list
+     * A pointer to the next link in the linked list. If this is the last link
      * in the chain, \c next will be 0.
      */
     struct list* next;
@@ -112,6 +112,7 @@ void* htable_lookup(const struct htable* table, const void* key, size_t key_len)
 
 /**
  * Generates a linked list of all keys contained within the given hash table.
+ * The last link in the chain will have a \c next value of 0.
  *
  * \param deep If set to true, the returned linked list will contain copies of
  * the keys stored within this table instead of pointers to the keys stored

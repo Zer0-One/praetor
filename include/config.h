@@ -18,20 +18,25 @@
 #include "hashtable.h"
 
 /**
- * A reference to the global hash table containing praetor's daemon-specific
+ * A pointer to the global hash table containing praetor's daemon-specific
  * configuration.
  */
 extern struct praetorinfo* rc_praetor;
 /**
- * A reference to the global hash table containing praetor's network-specific
+ * A pointer to the global hash table containing praetor's network-specific
  * configuration, indexed by the user-specified name of the network.
  */
 extern struct htable* rc_network;
 /**
- * A reference to the global hash table containing praetor's network-specific
- * configuration, indexed by socket file descriptor.
+ * A pointer to the global hash table containing the handles for praetor's
+ * network-specific configuration, indexed by socket file descriptor.
  */
 extern struct htable* rc_network_sock;
+/**
+ * A pointer to the global hash table containing configuration for praetor's
+ * loaded plugins.
+ */
+extern struct htable* rc_plugin;
 
 /**
  * Contains the configuration options required for praetor to function as a
@@ -61,44 +66,9 @@ struct praetorinfo{
 };
 
 /**
- * A linked list that contains IRC channel names.
- */
-struct channel{
-    /**
-     * The name of an IRC channel.
-     */
-    char* name;
-    /**
-     * A pointer to the next channel struct in the list. This pointer will be
-     * null if this is the last element in the list.
-     */
-    struct channel* next;
-};
-
-/**
- * A linked list that contains the IRC nicknames of administrators of this bot.
- */
-struct admin{
-    /**
-     * The IRC nickname of an administrator of this bot.
-     */
-    char* name;
-    /**
-     * A pointer to the next admins struct in the list. This pointer will be
-     * null if this is the last element in the list.
-     */
-    struct admin* next;
-};
-
-/**
- * This struct represents the configuration of a plugin for a particular IRC
- * network.
+ * This struct represents the configuration of a loaded plugin
  */
 struct plugin{
-    /**
-     * A handle for this plugin.
-     */
-    char* name;
     /**
      * If set to true, this plugin will be allowed to send and receive private
      * messages.
@@ -123,11 +93,17 @@ struct plugin{
     struct channelinfo* output;
 };
 
+struct channel{
+    const char* name;
+    const char* password;
+};
+
 /**
  * A struct that contains configuration options for connections to an IRC
  * network.
  */
 struct networkinfo{
+    const char* name;
     /**
      * The DNS name or IP address and TCP port of the IRC server to connect to.
      */
@@ -164,15 +140,14 @@ struct networkinfo{
      */
     const char* real_name;
     /**
-     * A linked list containing the names of the channels on this network that
+     * A hash table containing the names of the channels on this network that
      * praetor will join upon registering a connection.
      */
-    struct channel* channels;
+    struct htable* channels;
     /**
-     * A linked list containing the IRC nicknames of administrators of this
-     * bot.
+     * A hash table containing the IRC nicknames of administrators of this bot.
      */
-    struct admin* admins;
+    struct htable* admins;
     /**
      * A hash table containing plugin configuration for this network. This hash
      * table maps plugin handles to plugin structs.
@@ -200,7 +175,6 @@ struct networkinfo{
  * configuration options are stored.
  * @param[out] rc_network A pointer to a hash table that maps network names to
  * networkinfo structs.
- * options.
  */
 void loadconfig(char* path);
 

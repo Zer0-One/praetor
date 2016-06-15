@@ -14,14 +14,14 @@ praetor_version='"$(shell cat VERSION)"'
 praetor: bin/praetor
 praetor-debug: bin/praetor_debug
 
-bin/praetor: src/*.c src/util/*.c include/*.h
+bin/praetor: src/*.c src/util/*.c
 		-mkdir bin
 		$(cc) -O2 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
 		chmod +x bin/praetor
 
-bin/praetor_debug: src/*.c src/util/*.c include/*.h
+bin/praetor_debug: src/*.c src/util/*.c
 		-mkdir bin
-		$(cc) -g -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
+		$(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
 		chmod +x bin/praetor_debug
 
 deps:
