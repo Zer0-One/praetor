@@ -93,6 +93,9 @@ struct plugin{
     struct channelinfo* output;
 };
 
+/**
+ * This struct describes an IRC channel.
+ */
 struct channel{
     const char* name;
     const char* password;
@@ -140,6 +143,10 @@ struct networkinfo{
      */
     const char* real_name;
     /**
+     * The message to be sent with a QUIT command.
+     */
+    const char* quit_msg;
+    /**
      * A hash table containing the names of the channels on this network that
      * praetor will join upon registering a connection.
      */
@@ -161,6 +168,16 @@ struct networkinfo{
      * A libtls connection context.
      */
     struct tls* ctx;
+    /**
+     * A buffer for the next message(s) from this network. At any given time,
+     * this buffer may contain no full lines, or multiple lines.
+     */
+    char* msg;
+    /**
+     * An index one greater than the index of the last character in the message
+     * buffer.
+     */
+    int msg_pos;
 };
 
 /**

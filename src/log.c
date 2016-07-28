@@ -35,7 +35,7 @@ void logprintf(int loglevel, char* msg, ...){
     gettimeofday(&tv, NULL);
     struct tm* bd_time = localtime(&tv.tv_sec);
     strftime(date_buffer, DATE_BUFFER_LENGTH, "[%a %b %d %T %Y] ", bd_time);
-    printf(date_buffer);
+    printf("%s", date_buffer);
 
     if(loglevel == LOG_ALERT){
         printf("Alert: ");

@@ -76,8 +76,13 @@ struct htable* htable_create(size_t size){
         return NULL;
     }
     struct htable* table = calloc(1, sizeof(struct htable));
+    if(table == NULL){
+        logmsg(LOG_ERR, "htable: could not allocate memory for a new hash table\n");
+        return NULL;
+    }
     table->bucket_array = calloc(size, sizeof(struct htable_data));
-    if(table->bucket_array == NULL || table == NULL){
+    if(table->bucket_array == NULL){
+        free(table);
         logmsg(LOG_ERR, "htable: could not allocate memory for a new hash table\n");
         return NULL;
     }
@@ -182,6 +187,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
     if(htable_data_write(table, entry->next, key, key_len, value) == -1){
         return -1;
     }
+    
     load_check:
     table->size++;
     //if loadfactor threshold is exceeded, double the table size and rehash
@@ -240,6 +246,9 @@ int htable_remove(struct htable* table, const void* key, size_t key_len){
 }
 
 void htable_key_list_free(struct list* key_list, bool deep){
+    if(key_list == NULL){
+        return;
+    }
     struct list* list_this = key_list;
     while(list_this != 0){
         if(deep){
@@ -252,6 +261,9 @@ void htable_key_list_free(struct list* key_list, bool deep){
 }
 
 struct list* htable_get_keys(const struct htable* table, bool deep){
+    if(table->size == 0){
+        return NULL;
+    }
     struct list* key_list = calloc(1, sizeof(struct list));
     struct list* list_this = key_list;
     if(key_list == NULL){

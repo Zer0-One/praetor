@@ -117,7 +117,8 @@ void* htable_lookup(const struct htable* table, const void* key, size_t key_len)
  * \param deep If set to true, the returned linked list will contain copies of
  * the keys stored within this table instead of pointers to the keys stored
  * within the table.
- * \return A linked list of keys stored within the given hash table.
+ * \return A linked list of keys stored within the given hash table, or NULL if
+ * the system is out of memory or if there are no entries in this hash table.
  */
 struct list* htable_get_keys(const struct htable* table, bool deep);
 

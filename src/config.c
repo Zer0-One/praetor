@@ -80,7 +80,7 @@ void loadconfig(char* path){
             //instantiate hash tables for this network
             networkinfo_this->channels = htable_create(10);
             networkinfo_this->plugins = htable_create(10);
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s?O, s?O, s?O}", "name", &networkinfo_this->name, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
+            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?O, s?O, s?O}", "name", &networkinfo_this->name, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "quit_msg", &networkinfo_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 _exit(-1);
             }

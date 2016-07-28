@@ -14,13 +14,14 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "hashtable.h"
+#include "inet.h"
+#include "irc.h"
 #include "log.h"
-
-#define MSG_BUF_SIZE 500
 
 /**
  * The number of pollfd structs currently being monitored for input.
@@ -28,8 +29,8 @@
 size_t monitor_list_count = 0;
 
 /**
- * An array of pollfd structs for monitoring I/O readiness in both pipes for
- * plugin I/O, and sockets for IRC network I/O.
+ * An array of pollfd structs for monitoring I/O readiness in sockets for
+ * plugin I/O and IRC network I/O.
  */
 struct pollfd* monitor_list = NULL;
 
@@ -67,20 +68,43 @@ void watch_remove(const int fd){
 
 void run(){
     if(monitor_list_count < 1){
-        logmsg(LOG_ERR, "nexus: There are no sockets to monitor, dummy\n");
+        logmsg(LOG_ERR, "nexus: No sockets to monitor, exiting\n");
         return;
     }
-    char msg[MSG_BUF_SIZE];
+    
     while(true){
         if(poll(monitor_list, monitor_list_count, -1) < 1){
             //poll will never return 0, because we never time out
             //check to see if we were interrupted by a signal, or if we ran out of memory
         }
         for(int i = 0; i < monitor_list_count; i++){
-            if(monitor_list[i].revents & POLLIN){
+            if(monitor_list[i].revents & POLLIN){// && monitor_list[i].revents & POLLOUT){
                 struct networkinfo* n = htable_lookup(rc_network_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
-
-                logmsg(LOG_DEBUG, "%s\n", msg);
+                ssize_t ret;
+                //copy bytes from the current position in the buffer until the end, or until we run out of bytes to copy
+                if(n->ssl){
+                    if((ret = tls_read(n->ctx, n->msg + n->msg_pos, MSG_SIZE - n->msg_pos)) == -1){
+                        //error has occurred, re-connect and clear message buffer and position, continue
+                    }
+                }
+                else{
+                    if((ret = recv(n->sock, n->msg + n->msg_pos, MSG_SIZE - n->msg_pos, 0)) == -1){
+                        //error has occurred, re-connect and clear message buffer and position, continue
+                    }
+                    else if (ret == 0){
+                        //the socket has shutdown, re-connect and clear message buffer and position, continue
+                    }
+                }
+                n->msg_pos += ret;
+               
+                char buf[MSG_SIZE];
+                while((ret = irc_msg_recv(n->name, buf, MSG_SIZE)) != -1){
+                    logmsg(LOG_DEBUG, "%.*s", (int)ret, buf);
+                    //if any full lines can be read from the buffer, handle numerics and pass them on to plugins
+                    if(irc_handle_ping(n->name, buf, (int)ret) == -1){
+                        //the socket has shutdown, re-connect and clear message buffer and position, continue
+                    }
+                }
             }
         }
     }

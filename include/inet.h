@@ -29,20 +29,6 @@
 int inet_connect(const char* host, const char* service);
 
 /**
- * Reads a single line from the connection associated with the given socket
- * file descriptor, \c fd, into the buffer pointed to by \c buf. Reading stops
- * after \c num characters have been read, or when the first newline character
- * is encountered.
- *
- * \param fd A socket file descriptor whose associated connection will be read
- * from.
- * \param buf The buffer into which characters will be read.
- * \param num The maximum number of characters to read.
- * \return The number of characters read.
- */
-int inet_readline(int sock, void* buf, size_t num);
-
-/**
  * Upgrades an already-established socket connection to a TLS connection.
  *
  * \param sock The socket file descriptor whose associated socket connection
