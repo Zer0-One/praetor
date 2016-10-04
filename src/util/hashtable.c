@@ -202,7 +202,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
         }
         logmsg(LOG_DEBUG, "htable %p: table resized and rehashed from %zu to %zu buckets\n", (void*)table, table->bucket_count/2, table->bucket_count);
     }
-    logmsg(LOG_DEBUG, "htable %p: added new mapping for key:%p value:%p, table size: %zu\n", (void*)table, key, value, table->size);
+    logmsg(LOG_DEBUG, "htable %p: added new mapping for key:%p - value:%p, table size: %zu\n", (void*)table, key, value, table->size);
     return 0;
 }
 
@@ -212,6 +212,10 @@ void htable_destroy(struct htable* table){
 }
 
 void* htable_lookup(const struct htable* table, const void* key, size_t key_len){
+    if(table == NULL){
+        logmsg(LOG_ERR, "htable: NULL table provided for lookup for key:%p\n", key);
+        return NULL;
+    }
     size_t index = (hash(key, key_len) % table->bucket_count);
     struct htable_data* entry = &table->bucket_array[index];
     while(entry != 0){

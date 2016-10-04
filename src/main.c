@@ -86,6 +86,8 @@ int main(int argc, char* argv[]){
     }
     rc_network = htable_create(5);
     rc_network_sock = htable_create(5);
+    rc_plugin = htable_create(5);
+    rc_plugin_sock = htable_create(5);
 
     //load configuration
     loadconfig(config_path);
@@ -94,6 +96,13 @@ int main(int argc, char* argv[]){
     if(!foreground){
         daemonize(rc_praetor->workdir, rc_praetor->user, rc_praetor->group);
     }
+
+    //load plugins
+    struct list* plugins = htable_get_keys(rc_plugin, false);
+    for(struct list* this = plugins; this != 0; this = this->next){
+        //load the plugin
+    }
+    htable_key_list_free(plugins, false);
 
     //connect to IRC
     struct list* networks = htable_get_keys(rc_network, false);

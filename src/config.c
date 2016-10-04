@@ -23,8 +23,8 @@
 #include "hashtable.h"
 
 struct praetorinfo* rc_praetor;
-struct htable* rc_network;
-struct htable* rc_network_sock;
+struct htable* rc_network, * rc_network_sock;
+struct htable* rc_plugin, * rc_plugin_sock;
 
 void initconfig(struct praetorinfo* rc_praetor){
     rc_praetor->user = "praetor";
@@ -63,6 +63,32 @@ void loadconfig(char* path){
         }
     }
 
+    //Unpack and validate plugins configuration section
+    if(plugins_section == NULL){
+        logmsg(LOG_WARNING, "config: No plugins configured\n");
+    }
+    else if(!json_is_array(plugins_section)){
+        logmsg(LOG_ERR, "config: plugins section must be an array\n");
+        _exit(-1);
+    }
+    else{
+        json_t* value;
+        size_t index;
+        json_array_foreach(plugins_section, index, value){
+            struct plugin* plugin_this = calloc(1, sizeof(struct plugin));
+            if(plugin_this == NULL){
+                logmsg(LOG_ERR, "config: Cannot allocate memory for plugin configuration\n");
+                _exit(-1);
+            }
+            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s}", "name", &plugin_this->name, "path", &plugin_this->path) == -1){
+                logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
+                _exit(-1);
+            }
+            htable_add(rc_plugin, plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
+            logmsg(LOG_DEBUG, "config: Added configuration for plugin %s\n", plugin_this->name);
+        }
+    }
+
     //Unpack and validate networks configuration section
     if(networks_section == NULL){
         logmsg(LOG_WARNING, "config: No networks section, praetor will not connect to any IRC networks\n");
@@ -77,6 +103,10 @@ void loadconfig(char* path){
         json_array_foreach(networks_section, index, value){
             //create a fresh networkinfo struct for each network
             struct networkinfo* networkinfo_this = calloc(1, sizeof(struct networkinfo));
+            if(networkinfo_this == NULL){
+                logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
+                _exit(-1);
+            }
             //instantiate hash tables for this network
             networkinfo_this->channels = htable_create(10);
             networkinfo_this->plugins = htable_create(10);
@@ -124,6 +154,10 @@ void loadconfig(char* path){
             else{
                 json_array_foreach(channels, channel_index, channel_value){
                     struct channel* channel_this = calloc(1, sizeof(struct channel));
+                    if(channel_this == NULL){
+                        logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
+                        _exit(-1);
+                    }
                     if(json_unpack_ex(channel_value, &error, JSON_STRICT, "{s:s, s?s}", "name", &channel_this->name, "password", &channel_this->password) == -1){
                         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                         _exit(-1);

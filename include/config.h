@@ -23,20 +23,17 @@
  */
 extern struct praetorinfo* rc_praetor;
 /**
- * A pointer to the global hash table containing praetor's network-specific
- * configuration, indexed by the user-specified name of the network.
+ * Pointers to the global hash tables containing praetor's network-specific
+ * configuration, indexed by the user-specified name of the network, and by
+ * socket file descriptor, respectively.
  */
-extern struct htable* rc_network;
+extern struct htable* rc_network, * rc_network_sock;
 /**
- * A pointer to the global hash table containing the handles for praetor's
- * network-specific configuration, indexed by socket file descriptor.
+ * Pointers to the global hash tables containing configuration for praetor's
+ * loaded plugins, indexed by the user-specified name of the plugin, and by
+ * socket file descriptor, respectively.
  */
-extern struct htable* rc_network_sock;
-/**
- * A pointer to the global hash table containing configuration for praetor's
- * loaded plugins.
- */
-extern struct htable* rc_plugin;
+extern struct htable* rc_plugin, * rc_plugin_sock;
 
 /**
  * Contains the configuration options required for praetor to function as a
@@ -70,6 +67,34 @@ struct praetorinfo{
  */
 struct plugin{
     /**
+     * A handle for the plugin, to be used as an index in hash tables.
+     */
+    char* name;
+    /**
+     * The name of the plugin author, to be printed on calls to
+     * plugin_get_author().
+     */
+    char* author;
+    /**
+     * The version of the plugin
+     */
+    char* version;
+    /**
+     * A description of the plugin, to be printed on calls to
+     * plugin_get_description().
+     */
+    char* description;
+    /**
+     * The filesystem path at which the plugin binary is located.
+     */
+    char* path;
+    /**
+     * If set to true, this plugin will receive IRC messages as they are
+     * received, verbatim. Otherwise, the relevant fields of the IRC message
+     * will be parsed out into comma-delimited key-value pairs.
+     */
+    bool raw;
+    /**
      * If set to true, this plugin will be allowed to send and receive private
      * messages.
      */
@@ -77,7 +102,7 @@ struct plugin{
     /**
      * The number of milliseconds that this plugin will be required to wait
      * before sending another message. If the plugin sends messages at a rate
-     * that exceed this limit, the messages will be queued and sent one-by-one
+     * that exceeds this limit, the messages will be queued and sent one-by-one
      * as the rate_limit timer cycles.
      */
     int rate_limit;
@@ -106,6 +131,9 @@ struct channel{
  * network.
  */
 struct networkinfo{
+    /**
+     * A handle for the network, to be used as an index in hash tables.
+     */
     const char* name;
     /**
      * The DNS name or IP address and TCP port of the IRC server to connect to.

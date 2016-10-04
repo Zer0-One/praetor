@@ -1,8 +1,8 @@
 #
 # Makefile for praetor.
 #
-# Compiler: gcc
 
+#May be set to either 'clang' or 'gcc', but `make test` will not run without clang's "scan-build" utility installed.
 cc = clang
 test_sources = test/*.c test/unity/src/*.c
 
@@ -24,9 +24,6 @@ bin/praetor_debug : src/*.c src/util/*.c
 		$(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
 		chmod +x bin/praetor_debug
 
-deps :
-		cd deps/libressl/ && ./autogen.sh && ./configure && make -j4 check && sudo make install
-
 test :
 		chmod +x test/unity/auto/*
 		ruby test/unity/auto/generate_test_runner.rb test/tests.c test/test_runner.c
@@ -35,7 +32,7 @@ test :
 		./test/test_runner
 
 analyze : src/*.c src/util/*.c
-		scan-build -v -o analysis $(cc) -O3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o praetor
+		scan-build -v -o analysis $(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o praetor
 		chmod +x bin/praetor
 
 docs :
