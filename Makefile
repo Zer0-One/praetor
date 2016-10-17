@@ -41,7 +41,7 @@ docs :
 
 clean : 
 		-rm -r bin
-		-rm -r doc
+		-find doc/* -type d -exec rm -rf {} +
 		-rm test/test_runner
 		-rm test/test_runner.c
 
