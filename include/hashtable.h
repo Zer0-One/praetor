@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015, David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -80,8 +80,9 @@ void htable_destroy(struct htable* table);
  * into the hash table via memcpy() for use in resolving hash collisions.
  * \param key_len The size, in char-sized units, of the \c key.
  * \param value The value to store in the specified hash table.
- * \return 0 on success, -1 if the system is out of memory, and 1 if a mapping
- * for the given key already exists.
+ * \return 0 on success.
+ * \return -1 If the system is out of memory.
+ * \return -2 If a mapping for the given key already exists.
  */
 int htable_add(struct htable* table, const void* key, size_t key_len, void* value);
 
@@ -92,15 +93,17 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
  * removed.
  * \param key The key to index the specified value.
  * \param key_len The size, in char-sized units, of the \c key.
- * \return 0 on success, and -1 if the given key did not index any values.
+ * \return 0 on success.
+ * \return -1 if the given key did not index any values.
  */
 int htable_remove(struct htable* table, const void* key, size_t key_len);
 
 /**
  * Performs a lookup for the value mapped to the given key in the specified
  * hash table. When a bucket stores multiple mappings, the correct entry is
- * found by comparing the given key and the stored key with memcmp. The given
- * key must match the stored key exactly in both size and content.
+ * found by comparing the given key and the stored key with memcmp() for \c
+ * key_len bytes. The given key must match the stored key exactly in both size
+ * and content.
  *
  * \param table The hash table to be searched for the specified key.
  * \param key The key indexing the value being looked up.

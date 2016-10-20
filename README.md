@@ -63,7 +63,7 @@ The current to-do list:
 
 ## License
 
-    Copyright (c) 2015,2016 David Zero
+    Copyright (c) 2015-2017 David Zero
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without

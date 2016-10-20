@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -33,28 +33,28 @@ void daemonize(const char* workdir, const char* user, const char* group){
 	errno = 0;
 	struct passwd* usr = getpwnam(user);
 	if(usr == NULL){
-		logmsg(LOG_ERR, "Failed to get uid for user: '%s'. %s", user, strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to get uid for user: '%s'. %s\n", user, strerror(errno));
 		_exit(-1);
 	}
 	errno = 0;
 	struct group* grp = getgrnam(group);
 	if(grp == NULL){
-		logmsg(LOG_ERR, "Failed to get gid for group: '%s'. %s", group, strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to get gid for group: '%s'. %s\n", group, strerror(errno));
 		_exit(-1);
 	}
     //permanently drop privs
     if(setgid(grp->gr_gid) == -1){
-        logmsg(LOG_ERR, "Failed to set group to: '%s'. %s", group, strerror(errno));
+        logmsg(LOG_ERR, "daemonize: Failed to set group to: '%s'. %s\n", group, strerror(errno));
         _exit(-1);
     }
 	if(setuid(usr->pw_uid) == -1){
-		logmsg(LOG_ERR, "Failed to set user to: '%s'. %s", user, strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to set user to: '%s'. %s\n", user, strerror(errno));
 		_exit(-1);
 	}
 
 	switch(fork()){
 		case -1:
-			logmsg(LOG_ERR, "Failed to fork. %s", strerror(errno));
+			logmsg(LOG_ERR, "daemonize: Failed to fork. %s\n", strerror(errno));
 			_exit(-1);
 		case 0:
 			break;
@@ -63,14 +63,14 @@ void daemonize(const char* workdir, const char* user, const char* group){
 	}
 
 	if(setsid() == -1){
-		logmsg(LOG_ERR, "Failed to start new session. %s", strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to start new session. %s\n", strerror(errno));
 		_exit(-1);
 	}
 
 	//fork again so we're not a session leader
 	switch(fork()){
 		case -1:
-			logmsg(LOG_ERR, "Failed to fork. %s", strerror(errno));
+			logmsg(LOG_ERR, "daemonize: Failed to fork. %s\n", strerror(errno));
 			_exit(-1);
 		case 0:
 			break;
@@ -81,13 +81,13 @@ void daemonize(const char* workdir, const char* user, const char* group){
 	umask(S_IWGRP | S_IWOTH);
 
 	if(chdir(workdir) == -1){
-		logmsg(LOG_ERR, "Failed to change directory to %s. %s", workdir, strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to change directory to %s. %s\n", workdir, strerror(errno));
 		_exit(-1);
 	}
 
 	int fd_ulimit = sysconf(_SC_OPEN_MAX);
 	if(fd_ulimit == -1){
-		logmsg(LOG_INFO, "Could not determine upper limit on process file descriptors, using value: %i", FD_ULIMIT);
+		logmsg(LOG_INFO, "daemonize: Could not determine upper limit on process file descriptors, using value: %i\n", FD_ULIMIT);
 		fd_ulimit = FD_ULIMIT;
 	}
 	closelog();
@@ -95,15 +95,15 @@ void daemonize(const char* workdir, const char* user, const char* group){
 		close(i);
 	}
 	if(open("/dev/null", O_RDWR) != 0){
-		logmsg(LOG_ERR, "Failed to open /dev/null. %s", strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to open /dev/null. %s\n", strerror(errno));
 		_exit(-1);
 	}
 	if(dup2(0, 1) != 1){
-		logmsg(LOG_ERR, "Failed to copy file descriptor 0 (/dev/null) to 1. %s", strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to copy file descriptor 0 (/dev/null) to 1. %s\n", strerror(errno));
 		_exit(-1);
 	}
 	if(dup2(0, 2) != 2){
-		logmsg(LOG_ERR, "Failed to copy file descriptor 1 (/dev/null) to 2. %s", strerror(errno));
+		logmsg(LOG_ERR, "daemonize: Failed to copy file descriptor 1 (/dev/null) to 2. %s\n", strerror(errno));
 		_exit(-1);
 	}
 }

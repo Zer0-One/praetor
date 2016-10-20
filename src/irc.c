@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -40,7 +40,7 @@ int irc_connect(const char* network){
         //strtok modifies its argument, so make a copy
         if((tmp = calloc(1, strlen(n->host)+1)) == NULL){
             logmsg(LOG_WARNING, "irc: Out of memory, could not connect to IRC network '%s'\n", network);
-            return -1;
+            return -3;
         }
         strcpy(tmp, n->host);
         host = strtok(tmp, ":");
@@ -80,7 +80,52 @@ int irc_connect(const char* network){
 
     //map the socket to the irc network config
     htable_add(rc_network_sock, &n->sock, sizeof(n->sock), n);
+
+    //add the socket to the global watchlist
+    if(watch_add(n->sock) == -1){
+        if(close(n->sock) == -1){
+            logmsg(LOG_WARNING, "irc: Could not close socket connection to network %s\n", n->name);
+        }
+        return -2;
+    }
+
+    //register an IRC connection
+    if(irc_register_connection(network) == -1){
+        irc_disconnect(network, n->quit_msg);
+        return -3;
+    }
+
+    //connect to all channels
+    struct list* channels = htable_get_keys(n->channels, false);
+    if(channels == NULL){
+        logmsg(LOG_WARNING, "irc: Failed to load list of configured channels for network: %s", n->name);
+        logmsg(LOG_WARNING, "irc: Network: %s has no configured channels, or the system is out of memory\n", n->name);
+        return n->sock;
+    }
+    for(struct list* this = channels; this != 0; this = this->next){
+        irc_channel_join(network, this->key);
+    }
+    htable_key_list_free(channels, false);
+
     return n->sock;
+}
+
+int irc_connect_all(){
+    struct list* networks = htable_get_keys(rc_network, false);
+    if(networks == NULL){
+        logmsg(LOG_WARNING, "irc: Failed to load list of configured networks\n");
+        logmsg(LOG_WARNING, "irc: There are no configured networks, or the system is out of memory\n");
+        return -1;
+    }
+    int ret = 0;
+    for(struct list* this = networks; this != 0; this = this->next){
+        if(irc_connect(this->key) < 0){
+            ret = -1;
+        }
+    }
+    htable_key_list_free(networks, false);
+
+    return ret;
 }
 
 int irc_register_connection(const char* network){
@@ -126,6 +171,7 @@ int irc_disconnect(const char* network, const char* msg){
         logmsg(LOG_WARNING, "irc: Could not disconnect from network %s\n", n->name);
     }
     watch_remove(n->sock);
+    htable_remove(rc_network_sock, &n->sock, sizeof(n->sock));
     
     return 0;
 }
@@ -158,40 +204,6 @@ int irc_channel_join(const char* network, const char* channel){
         return -1;
     }
     
-    return 0;
-}
-
-int irc_connect_all(const char* network){
-    struct networkinfo* n;
-    if((n = (struct networkinfo*)htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
-        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
-        return -1;
-    }
-    
-    if(irc_connect(network) == -1){
-        return -1;
-    }
-    if(watch_add(n->sock) == -1){
-        if(close(n->sock) == -1){
-            logmsg(LOG_WARNING, "irc: Could not close socket connection to network %s\n", n->name);
-        }
-        return -1;
-    }
-    if(irc_register_connection(network) == -1){
-        irc_disconnect(network, n->quit_msg);
-        return -1;
-    }
-
-    struct list* channels = htable_get_keys(n->channels, false);
-    if(channels == NULL){
-        logmsg(LOG_WARNING, "irc: No channels configured for network %s\n", n->name);
-        return 0;
-    }
-    for(struct list* this = channels; this != 0; this = this->next){
-        irc_channel_join(network, this->key);
-    }
-    htable_key_list_free(channels, false);
-
     return 0;
 }
 

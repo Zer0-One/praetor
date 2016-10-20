@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -16,39 +16,41 @@
 /**
  * Loads an executable plugin from the given path. The executable will be
  * forked, and its standard streams will be directed over an anonymous domain
- * socket toward praetor's master process.
+ * socket toward praetor.
  *
  * \param path The filesystem path to the executable to be loaded. Relative
  * paths will be based in praetor's configured working directory; absolute
  * paths are used verbatim.
- * \return 0 on success, and -1 if the plugin could not be loaded.
+ * \return 0 on success.
+ * \return -1 if the plugin could not be loaded.
  */
 int plugin_load(const char* path);
 
 /**
  * Calls plugin_load() for every plugin defined in praetor's configuration.
  * 
- * \return 0 on success, and -1 if any plugin could not be successfully loaded.
+ * \return 0 on success.
+ * \return -1 if plugin_load() fails for any plugin.
  */
 int plugin_load_all();
 
 /**
- * Unloads a currently-loaded executable plugin by cleaning up any relevant
- * state, and then terminating the child process belonging to the specified
- * plugin.
+ * Unloads a currently-loaded executable plugin by removing its mappings in the
+ * rc_plugin and rc_plugin_sock hash tables, closing its socket connection, and
+ * then terminating its process.
  *
  * \param name The handle indexing the plugin in the rc_plugin hash table.
- * \return 0 on success, and -1 if the plugin could not be successfully
- * terminated.
+ * \return 0 on success
+ * \return -1 if the plugin could not be successfully terminated.
  */
 int plugin_unload(const char* name);
 
 /**
- * Calls plugin_unload_all() for every plugin currently loaded and indexed by
- * the rc_plugin hash table.
+ * Calls plugin_unload() for every plugin currently loaded and indexed by the
+ * rc_plugin hash table.
  *
- * \return 0 on success, and -1 if any plugin could not be successfully
- * terminated.
+ * \return 0 on success
+ * \return -1 if any plugin could not be successfully terminated.
  */
 int plugin_unload_all();
 
@@ -56,8 +58,9 @@ int plugin_unload_all();
  * Calls plugin_unload() and plugin_load() for the specified plugin.
  *
  * \param name The handle indexing the plugin in the rc_plugin hash table.
- * \return 0 on success, and -1 if the plugin could not be either terminated or
- * started successfully.
+ * \return 0 on success
+ * \return -1 if the plugin could not be either terminated or started
+ * successfully.
  */
 int plugin_reload(const char* name);
 

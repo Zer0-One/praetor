@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -26,17 +26,22 @@ struct praetorinfo* rc_praetor;
 struct htable* rc_network, * rc_network_sock;
 struct htable* rc_plugin, * rc_plugin_sock;
 
+json_t* root = NULL;
+
 void initconfig(struct praetorinfo* rc_praetor){
     rc_praetor->user = "praetor";
     rc_praetor->group = "praetor";
     rc_praetor->workdir = "/var/lib/praetor";
-    rc_praetor->plugin_path = "/usr/share/praetor/plugins";
 }
 
 void loadconfig(char* path){
     srandom(time(NULL));
     json_error_t error;
-    json_t* root = json_load_file(path, 0, &error);
+    //if we're reloading the config, free the old one
+    if(root){
+        json_decref(root);
+    }
+    root = json_load_file(path, 0, &error);
     logmsg(LOG_DEBUG, "config: Loaded configuration file %s\n", path);
     if(root == NULL){
         logmsg(LOG_ERR, "config: %s at line %d, column %d\n", error.text, error.line, error.column);
@@ -47,7 +52,7 @@ void loadconfig(char* path){
     json_t* daemon_section = NULL, *networks_section = NULL, *plugins_section;
     
     //Unpack and validate root object
-    if(json_unpack_ex(root, &error, JSON_STRICT, "{s?O, s?O, s?O}", "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
+    if(json_unpack_ex(root, &error, JSON_STRICT, "{s?o, s?o, s?o}", "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
         _exit(-1);
     }
@@ -57,7 +62,7 @@ void loadconfig(char* path){
         logmsg(LOG_WARNING, "config: No daemon section, using default settings\n");
     }
     else{
-        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, "{s?s, s?s, s?s, s?s}", "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir, "plugins", &rc_praetor->plugin_path) == -1){
+        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, "{s?s, s?s, s?s, s?s}", "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
             logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
             _exit(-1);
         }
@@ -110,7 +115,7 @@ void loadconfig(char* path){
             //instantiate hash tables for this network
             networkinfo_this->channels = htable_create(10);
             networkinfo_this->plugins = htable_create(10);
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?O, s?O, s?O}", "name", &networkinfo_this->name, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "quit_msg", &networkinfo_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
+            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}", "name", &networkinfo_this->name, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "quit_msg", &networkinfo_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 _exit(-1);
             }

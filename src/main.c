@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -26,6 +26,7 @@
 #include "irc.h"
 #include "log.h"
 #include "nexus.h"
+#include "plugin.h"
 //#include "sighandlers.h"
 
 /**
@@ -98,18 +99,14 @@ int main(int argc, char* argv[]){
     }
 
     //load plugins
-    struct list* plugins = htable_get_keys(rc_plugin, false);
-    for(struct list* this = plugins; this != 0; this = this->next){
-        //load the plugin
+    if(plugin_load_all() < 0){
+        logmsg(LOG_WARNING, "main: Could not load all plugins\n");
     }
-    htable_key_list_free(plugins, false);
 
     //connect to IRC
-    struct list* networks = htable_get_keys(rc_network, false);
-    for(struct list* this = networks; this != 0; this = this->next){
-        irc_connect_all(this->key);
+    if(irc_connect_all() < 0){
+        logmsg(LOG_WARNING, "main: Could not connect to all IRC networks\n");
     }
-    htable_key_list_free(networks, false);
 
     //main event loop
     run();

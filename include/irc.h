@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -19,18 +19,32 @@
 #define MSG_SIZE 512
 
 /**
- * Establishes a socket connection to an IRC server. This function modifies the
- * \c networkinfo struct indexed by the \c network argument by setting its \c
- * sock and \c ctx pointers to their appropriate values.
- * 
+ * Establishes a socket connection to an IRC server, adds the connected socket
+ * to the global watchlist, registers an IRC connection, and joins every
+ * channel configured for the given network.
+ *
+ * Note: this function modifies global state. The \c networkinfo struct indexed
+ * by the \c network argument is modified by setting its \c sock and \c ctx
+ * pointers to their appropriate values.
+ *
  * \param network A string indexing a networkinfo struct in the rc_network hash
  * table.
  * \return On success, this function returns a socket file descriptor. If the
- * given network was configured for SSL, you should not attempt to write or
- * read data via this descriptor directly; use the libtls API instead. On
- * failure, this function returns -1.
+ * given network was configured for SSL/TLS, you should not attempt to write or
+ * read data via this descriptor directly; use the libtls API instead. 
+ * \return -1 on failure to connect the socket.
+ * \return -2 on failure to register an IRC connection.
+ * \return -3 on failure due to an out-of-memory condition.
  */
 int irc_connect(const char* network);
+
+/**
+ * Calls irc_connect() for every network defined in praetor's configuration.
+ *
+ * \return 0 on success
+ * \return -1 if irc_connect() fails for any network.
+ */
+int irc_connect_all();
 
 /**
  * Registers a connection with an IRC server by performing a PASS/NICK/USER
@@ -38,7 +52,8 @@ int irc_connect(const char* network);
  *
  * \param network A string indexing a networkinfo struct in the rc_network hash
  * table.
- * \return 0 upon successfully registering the connection, and -1 on error.
+ * \return 0 upon successfully registering the connection
+ * \return -1 on error.
  */
 int irc_register_connection(const char* network);
 
@@ -52,8 +67,8 @@ int irc_register_connection(const char* network);
  * 
  * \param network A string indexing a networkinfo struct in the rc_network hash
  * table.
- * \return 0 on a successful disconnect (graceful or not), and -1 if no
- * configuration could be found for the given network handle.
+ * \return 0 on a successful disconnect (graceful or not)
+ * \return -1 if no configuration could be found for the given network handle.
  */
 int irc_disconnect(const char* network, const char* msg);
 
@@ -68,23 +83,10 @@ int irc_disconnect(const char* network, const char* msg);
  * table.
  * \param channel One of either: a string indexing a channel struct in the
  * channels hash table, or the name of a valid IRC channel.
- * \return 0 on a successful channel join, -1 on an unsuccessful join, and 1 if
- * the socket connection to the server was closed.
+ * \return 0 on a successful channel join
+ * \return -1 on an unsuccessful join
  */
 int irc_channel_join(const char* network, const char* channel);
-
-/**
- * Establishes a socket connection to an IRC server, adds the connected socket
- * to the global watchlist, registers an IRC connection, and joins every
- * channel configured for the given network. If any one of these steps fail,
- * (with the exception of failure to successfully join a channel) this function
- * fails.
- *
- * \param network A string indexing a networkinfo struct in the rc_network hash
- * table.
- * \return 0 on success, and -1 on failure.
- */
-int irc_connect_all(const char* network);
 
 /**
  * Parts a channel on the given IRC network.
@@ -106,7 +108,8 @@ int irc_channel_part(const char* network, const char* channel);
  * \param buf The buffer that the message to send will be read from.
  * \param len The length of the message to send.
  * \return On success, returns the number of characters sent from the supplied
- * buffer. On failure, returns -1.
+ * buffer.
+ * \return -1 on failure.
  */
 int irc_msg_send(const char* network, const char* buf, size_t len);
 
@@ -122,7 +125,8 @@ int irc_msg_send(const char* network, const char* buf, size_t len);
  * \param buf The buffer that the read line will be stored in.
  * \param len The size of \buf in char-sized units.
  * \return On success, returns the number of characters in the line read into
- * \c buf, including the terminating newline character. On failure, returns -1.
+ * \c buf, including the terminating newline character.
+ * \return -1 on failure.
  */
 ssize_t irc_msg_recv(const char* network, char* buf, size_t len);
 
@@ -146,7 +150,8 @@ void irc_handle_numeric(const char* msg);
  * to parse.
  * \param len The number of characters in the message contained in \c buf,
  * including the terminating newline character.
- * \return On success, returns 0. On failure, returns -1.
+ * \return 0 on success.
+ * \return -1 on failure.
  */
 int irc_handle_ping(const char* network, const char* buf, size_t len);
 

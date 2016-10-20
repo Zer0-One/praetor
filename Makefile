@@ -2,12 +2,12 @@
 # Makefile for praetor.
 #
 
-#May be set to either 'clang' or 'gcc', but `make test` will not run without clang's "scan-build" utility installed.
+#May be set to either 'clang' or 'gcc', but `make analyze` will not run without clang's "scan-build" utility installed.
 cc = clang
 test_sources = test/*.c test/unity/src/*.c
 
 commit_hash='"$(shell git log -n 1 --pretty=format:%H)"'
-praetor_version='"$(shell cat VERSION)"'
+praetor_version='"0.1.0"'
 
 .PHONY: all all-debug analyze deps docs test clean
 

@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -77,18 +77,18 @@ struct htable* htable_create(size_t size){
     }
     struct htable* table = calloc(1, sizeof(struct htable));
     if(table == NULL){
-        logmsg(LOG_ERR, "htable: could not allocate memory for a new hash table\n");
+        logmsg(LOG_ERR, "htable: Could not allocate memory for a new hash table\n");
         return NULL;
     }
     table->bucket_array = calloc(size, sizeof(struct htable_data));
     if(table->bucket_array == NULL){
         free(table);
-        logmsg(LOG_ERR, "htable: could not allocate memory for a new hash table\n");
+        logmsg(LOG_ERR, "htable: Could not allocate memory for a new hash table\n");
         return NULL;
     }
     table->bucket_count = size;
     table->load_threshold = .75;
-    logmsg(LOG_DEBUG, "htable %p: new hash table created\n", (void*)table);
+    logmsg(LOG_DEBUG, "htable %p: New hash table created\n", (void*)table);
     return table;
 }
 
@@ -151,7 +151,7 @@ int htable_data_write(struct htable* table, struct htable_data* entry, const voi
     entry->key = calloc(key_len, sizeof(char));
     if(entry->key == NULL){
         entry->key = 0;
-        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at: %p\n", (void*)table, key);
+        logmsg(LOG_ERR, "htable: Could not allocate enough memory to store mapping\n");
         return -1;
     }
     memcpy(entry->key, key, key_len);
@@ -163,7 +163,8 @@ int htable_data_write(struct htable* table, struct htable_data* entry, const voi
 int htable_add(struct htable* table, const void* key, size_t key_len, void* value){
     size_t index = (hash(key, key_len) % table->bucket_count);
     if(htable_lookup(table, key, key_len) != NULL){
-        return 1;
+        logmsg(LOG_DEBUG, "htable: Failed to add mapping, key already exists\n");
+        return -2;
     }
     //if you find an empty link within the chain, add your mapping there
     struct htable_data tmp = {.next = &table->bucket_array[index]};
@@ -181,7 +182,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
     entry->next = calloc(1, sizeof(struct htable_data));
     if(entry->next == NULL){
         entry->next = 0;
-        logmsg(LOG_ERR, "htable %p: could not allocate enough memory to store mapping for key at %p\n", (void*)table, key);
+        logmsg(LOG_ERR, "htable: Could not allocate enough memory to store mapping\n");
         return -1;
     }
     if(htable_data_write(table, entry->next, key, key_len, value) == -1){
@@ -196,13 +197,13 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
         table->size = 0;
         table->bucket_count *= 2;
         if(htable_rehash(table) == -1){
-            logmsg(LOG_ERR, "htable %p: could not allocate enough memory for resize/rehash\n", (void*)table);
+            logmsg(LOG_ERR, "htable: Could not allocate enough memory for resize/rehash\n");
             table->bucket_count /= 2;
             table->size = tmp_size;
         }
-        logmsg(LOG_DEBUG, "htable %p: table resized and rehashed from %zu to %zu buckets\n", (void*)table, table->bucket_count/2, table->bucket_count);
+        logmsg(LOG_DEBUG, "htable %p: Table resized and rehashed from %zu to %zu buckets\n", (void*)table, table->bucket_count/2, table->bucket_count);
     }
-    logmsg(LOG_DEBUG, "htable %p: added new mapping for key:%p - value:%p, table size: %zu\n", (void*)table, key, value, table->size);
+    logmsg(LOG_DEBUG, "htable %p: Added new mapping for key:%p - value:%p, table size: %zu\n", (void*)table, key, value, table->size);
     return 0;
 }
 
@@ -213,7 +214,7 @@ void htable_destroy(struct htable* table){
 
 void* htable_lookup(const struct htable* table, const void* key, size_t key_len){
     if(table == NULL){
-        logmsg(LOG_ERR, "htable: NULL table provided for lookup for key:%p\n", key);
+        logmsg(LOG_DEBUG, "htable: NULL htable provided for lookup\n");
         return NULL;
     }
     size_t index = (hash(key, key_len) % table->bucket_count);
@@ -240,7 +241,7 @@ int htable_remove(struct htable* table, const void* key, size_t key_len){
                 entry->key_len = 0;
                 entry->value = 0;
                 table->size--;
-                logmsg(LOG_DEBUG, "htable %p: removed mapping for key:%p, table size: %zu\n", (void*)table, key, table->size);
+                logmsg(LOG_DEBUG, "htable %p: Removed mapping for key:%p, table size: %zu\n", (void*)table, key, table->size);
                 return 0;
             }
         }
@@ -266,12 +267,13 @@ void htable_key_list_free(struct list* key_list, bool deep){
 
 struct list* htable_get_keys(const struct htable* table, bool deep){
     if(table->size == 0){
+        logmsg(LOG_DEBUG, "htable %p: Table has no entries\n", (void*)table);
         return NULL;
     }
     struct list* key_list = calloc(1, sizeof(struct list));
     struct list* list_this = key_list;
     if(key_list == NULL){
-        logmsg(LOG_ERR, "htable %p: Could not allocate memory for a new key list\n", (void*)table);
+        logmsg(LOG_ERR, "htable: Could not allocate memory for a new key list\n");
         return NULL;
     }
     for(int i = 0; i < table->bucket_count; i++){
@@ -302,7 +304,7 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
     return tmp;
 
     fail:
-        logmsg(LOG_ERR, "htable %p: Could not allocate memory for a new key list\n", (void*)table);
+        logmsg(LOG_ERR, "htable: Could not allocate memory for a new key list\n");
         struct list* temp = key_list->next;
         free(key_list);
         htable_key_list_free(temp, deep);

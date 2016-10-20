@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -18,7 +18,7 @@
 #include "hashtable.h"
 
 /**
- * A pointer to the global hash table containing praetor's daemon-specific
+ * A pointer to the global struct containing praetor's daemon-specific
  * configuration.
  */
 extern struct praetorinfo* rc_praetor;
@@ -55,11 +55,6 @@ struct praetorinfo{
      * to this directory.
      */
     const char* workdir;
-    /**
-     * The path to the directory containing plugins. This path will be
-     * recursively searched; symlinks will not be followed.
-     */
-    const char* plugin_path;
 };
 
 /**
@@ -89,12 +84,6 @@ struct plugin{
      */
     char* path;
     /**
-     * If set to true, this plugin will receive IRC messages as they are
-     * received, verbatim. Otherwise, the relevant fields of the IRC message
-     * will be parsed out into comma-delimited key-value pairs.
-     */
-    bool raw;
-    /**
      * If set to true, this plugin will be allowed to send and receive private
      * messages.
      */
@@ -105,7 +94,7 @@ struct plugin{
      * that exceeds this limit, the messages will be queued and sent one-by-one
      * as the rate_limit timer cycles.
      */
-    int rate_limit;
+    size_t rate_limit;
     /**
      * A linked list of channels that this plugin will be allowed to receive
      * input from.

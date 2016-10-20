@@ -2,13 +2,14 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
 * according to the terms of the Revised BSD License. The text of this license
 * can be found in the "LICENSE" file bundled with this source distribution.
 */
+
 #ifndef PRAETOR_NEXUS
 #define PRAETOR_NEXUS
 
@@ -17,8 +18,8 @@
  * wrapping it in a pollfd struct.
  *
  * \param fd A valid file descriptor.
- * \return If the file descriptor was successfully added to the monitor list,
- * this function returns 0. Otherwise, it returns -1.
+ * \return 0 if the file descriptor was successfully added to the monitor list.
+ * \return -1 on an out-of-memory condition.
  */
 int watch_add(int fd);
 

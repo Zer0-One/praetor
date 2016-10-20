@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015,2016 David Zero
+* Copyright (c) 2015-2017 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -104,6 +104,7 @@ void run(){
                     while((ret = irc_msg_recv(n->name, buf, MSG_SIZE)) != -1){
                         logmsg(LOG_DEBUG, "%.*s", (int)ret, buf);
                         //if any full lines can be read from the buffer, handle numerics and pass them on to plugins
+                        //plugin_message_to_json(the_message)
                         if(irc_handle_ping(n->name, buf, (int)ret) == -1){
                             //the socket has shutdown, re-connect and clear message buffer and position, continue
                         }
@@ -111,6 +112,8 @@ void run(){
                 }
                 //process plugin input
                 else if(p){
+                    //parse the JSON document, craft an IRC message, and send according to permissions and rate limit
+                    //plugin_message_from_json(the_message)
                 }
             }
         }

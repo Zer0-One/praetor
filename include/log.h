@@ -1,14 +1,14 @@
-/* 
- * This source file is part of praetor, a free and open-source IRC bot,
- * designed to be robust, portable, and easily extensible.
- *
- * Copyright (c) 2015,2016 David Zero
- * All rights reserved.
- *
- * The following code is licensed for use, modification, and redistribution
- * according to the terms of the Revised BSD License. The text of this license
- * can be found in the "LICENSE" file bundled with this source distribution.
- */
+/*
+* This source file is part of praetor, a free and open-source IRC bot,
+* designed to be robust, portable, and easily extensible.
+*
+* Copyright (c) 2015-2017 David Zero
+* All rights reserved.
+*
+* The following code is licensed for use, modification, and redistribution
+* according to the terms of the Revised BSD License. The text of this license
+* can be found in the "LICENSE" file bundled with this source distribution.
+*/
 
 #ifndef PRAETOR_LOG
 #define PRAETOR_LOG
@@ -34,8 +34,8 @@ extern bool debug;
 extern bool foreground;
 
 /**
- * Logs messages to the foreground when foreground logging is enabled. Do not
- * use this function directly. Use the logmsg() macro instead.
+ * Logs messages to the foreground. This function should not be used directly
+ * under normal circumstances. Use the logmsg() macro instead.
  *
  * \param loglevel One of the set of log priorities defined in <syslog.h>. Do
  * \b not include the logging facility. This function will use the logging
