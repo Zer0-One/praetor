@@ -10,18 +10,19 @@
 * can be found in the "LICENSE" file bundled with this source distribution.
 */
 
-#ifndef PRAETOR_DAEMONIZE
-#define PRAETOR_DAEMONIZE
+#ifndef PRAETOR_SIGNAL
+#define PRAETOR_SIGNAL
 
 /**
- * Turns the calling process into a daemon.
+ * Sets signal disposition and installs handlers for:
+ *     - SIGCHLD
+ *     - SIGHUP
+ *     - SIGPIPE
+ *     - SIGTERM
  *
- * \param workdir The directory that will be used as the daemon's working directory
- * \param user The user with whose privileges the daemon will run
- * \param group The group with whose privileges the daemon will run
  * \return 0 on success.
  * \return -1 on error.
  */
-int daemonize(const char* workdir, const char* user, const char* group);
+int signal_init();
 
 #endif

@@ -2,8 +2,7 @@
     "daemon": {
         "user": "praetor",
         "group": "praetor",
-        "workdir": "/var/lib/praetor",
-        "plugins": "/usr/share/praetor/plugins"
+        "workdir": "/var/lib/praetor"
     },
     "networks": [
         {
@@ -17,7 +16,7 @@
             "quit_msg": "I AM THE SHAZBOT",
             "channels": [
                 {
-                    "name": "##earthpig",
+                    "name": "##test1",
                     "password": "testpassword"
                 },
                 {

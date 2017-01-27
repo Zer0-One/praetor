@@ -10,12 +10,9 @@
 * can be found in the "LICENSE" file bundled with this source distribution.
 */
 
-#include <errno.h>
-#include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <syslog.h>
 #include <time.h>
@@ -34,32 +31,31 @@ void logprintf(int loglevel, char* msg, ...){
 
     gettimeofday(&tv, NULL);
     struct tm* bd_time = localtime(&tv.tv_sec);
-    strftime(date_buffer, DATE_BUFFER_LENGTH, "[%a %b %d %T %Y] ", bd_time);
-    printf("%s", date_buffer);
+    strftime(date_buffer, DATE_BUFFER_LENGTH, "[%F %T]", bd_time);
 
     if(loglevel == LOG_ALERT){
-        printf("Alert: ");
+        printf("%s Alert: ", date_buffer);
     }
     else if(loglevel == LOG_CRIT){
-        printf("Critical: ");
+        printf("%s Critical: ", date_buffer);
     }
     else if(loglevel == LOG_DEBUG){
-        printf("Debug: ");
+        printf("%s Debug: ", date_buffer);
     }
     else if(loglevel == LOG_EMERG){
-        printf("Alert: ");
+        printf("%s Alert: ", date_buffer);
     }
     else if(loglevel == LOG_ERR){
-        printf("Error: ");
+        printf("%s Error: ", date_buffer);
     }
     else if(loglevel == LOG_INFO){
-        printf("Info: ");
+        printf("%s Info: ", date_buffer);
     }
     else if(loglevel == LOG_NOTICE){
-        printf("Notice: ");
+        printf("%s Notice: ", date_buffer);
     }
     else if(loglevel == LOG_WARNING){
-        printf("Warning: ");
+        printf("%s Warning: ", date_buffer);
     }
     vprintf(msg, args);
 

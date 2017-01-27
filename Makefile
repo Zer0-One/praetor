@@ -2,7 +2,8 @@
 # Makefile for praetor.
 #
 
-#May be set to either 'clang' or 'gcc', but `make analyze` will not run without clang's "scan-build" utility installed.
+#May be set to either 'clang' or 'gcc', but `make analyze` will not run without
+#clang's "scan-build" utility installed.
 cc = clang
 test_sources = test/*.c test/unity/src/*.c
 
@@ -14,15 +15,19 @@ praetor_version='"0.1.0"'
 praetor: bin/praetor
 praetor-debug: bin/praetor_debug
 
-bin/praetor : src/*.c src/util/*.c
-		-mkdir bin
-		$(cc) -O3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
+bin/praetor : src/*.c include/*.h
+		mkdir -p bin
+		$(cc) -O3 -fPIE -pie -fstack-protector-strong -std=c99 -pedantic-errors -Wall -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o $@
 		chmod +x bin/praetor
 
-bin/praetor_debug : src/*.c src/util/*.c
-		-mkdir bin
-		$(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o $@
+bin/praetor_debug : src/*.c include/*.h
+		mkdir -p bin
+		$(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o $@
 		chmod +x bin/praetor_debug
+
+analyze : src/*.c
+		scan-build -v -o analysis $(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o praetor
+		chmod +x bin/praetor
 
 test :
 		chmod +x test/unity/auto/*
@@ -31,12 +36,8 @@ test :
 		chmod +x test/test_runner
 		./test/test_runner
 
-analyze : src/*.c src/util/*.c
-		scan-build -v -o analysis $(cc) -g3 -std=c99 -pedantic-errors -Wall -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o praetor
-		chmod +x bin/praetor
-
 docs :
-		-mkdir doc
+		mkdir -p doc
 		doxygen Doxyfile
 
 clean : 

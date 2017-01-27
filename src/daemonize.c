@@ -28,34 +28,34 @@
  */
 const int FD_ULIMIT = 9001;
 
-void daemonize(const char* workdir, const char* user, const char* group){
+int daemonize(const char* workdir, const char* user, const char* group){
     //fetch user and group info
 	errno = 0;
 	struct passwd* usr = getpwnam(user);
 	if(usr == NULL){
 		logmsg(LOG_ERR, "daemonize: Failed to get uid for user: '%s'. %s\n", user, strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 	errno = 0;
 	struct group* grp = getgrnam(group);
 	if(grp == NULL){
 		logmsg(LOG_ERR, "daemonize: Failed to get gid for group: '%s'. %s\n", group, strerror(errno));
-		_exit(-1);
+		return -1;
 	}
     //permanently drop privs
     if(setgid(grp->gr_gid) == -1){
         logmsg(LOG_ERR, "daemonize: Failed to set group to: '%s'. %s\n", group, strerror(errno));
-        _exit(-1);
+        return -1;
     }
 	if(setuid(usr->pw_uid) == -1){
 		logmsg(LOG_ERR, "daemonize: Failed to set user to: '%s'. %s\n", user, strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 
 	switch(fork()){
 		case -1:
 			logmsg(LOG_ERR, "daemonize: Failed to fork. %s\n", strerror(errno));
-			_exit(-1);
+			return -1;
 		case 0:
 			break;
 		default:
@@ -64,14 +64,14 @@ void daemonize(const char* workdir, const char* user, const char* group){
 
 	if(setsid() == -1){
 		logmsg(LOG_ERR, "daemonize: Failed to start new session. %s\n", strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 
 	//fork again so we're not a session leader
 	switch(fork()){
 		case -1:
 			logmsg(LOG_ERR, "daemonize: Failed to fork. %s\n", strerror(errno));
-			_exit(-1);
+			return -1;
 		case 0:
 			break;
 		default:
@@ -82,7 +82,7 @@ void daemonize(const char* workdir, const char* user, const char* group){
 
 	if(chdir(workdir) == -1){
 		logmsg(LOG_ERR, "daemonize: Failed to change directory to %s. %s\n", workdir, strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 
 	int fd_ulimit = sysconf(_SC_OPEN_MAX);
@@ -96,14 +96,16 @@ void daemonize(const char* workdir, const char* user, const char* group){
 	}
 	if(open("/dev/null", O_RDWR) != 0){
 		logmsg(LOG_ERR, "daemonize: Failed to open /dev/null. %s\n", strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 	if(dup2(0, 1) != 1){
 		logmsg(LOG_ERR, "daemonize: Failed to copy file descriptor 0 (/dev/null) to 1. %s\n", strerror(errno));
-		_exit(-1);
+		return -1;
 	}
 	if(dup2(0, 2) != 2){
 		logmsg(LOG_ERR, "daemonize: Failed to copy file descriptor 1 (/dev/null) to 2. %s\n", strerror(errno));
-		_exit(-1);
+		return -1;
 	}
+
+    return 0;
 }

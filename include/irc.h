@@ -16,7 +16,7 @@
 /**
  * The maximum size of an IRC message
  */
-#define MSG_SIZE 512
+#define MSG_SIZE_MAX 512
 
 /**
  * Establishes a socket connection to an IRC server, adds the connected socket
@@ -58,7 +58,7 @@ int irc_connect_all();
 int irc_register_connection(const char* network);
 
 /**
- * Performs a graceful disconnect from an IRC network. This function is
+ * Attempts a graceful disconnect from an IRC network. This function is
  * guaranteed to disconnect praetor from the given IRC network by performing an
  * IRC QUIT, and terminating the socket connection; it does so gracefully if
  * possible, and ungracefully if necessary. This function also removes the
@@ -67,10 +67,23 @@ int irc_register_connection(const char* network);
  * 
  * \param network A string indexing a networkinfo struct in the rc_network hash
  * table.
+ * \param msg An IRC quit message to send to the server, or NULL if no message
+ * should be sent.
+ * \param len The length of the quit message to be sent.
  * \return 0 on a successful disconnect (graceful or not)
  * \return -1 if no configuration could be found for the given network handle.
  */
-int irc_disconnect(const char* network, const char* msg);
+int irc_disconnect(const char* network, const char* msg, size_t len);
+
+/**
+ * Calls irc_disconnect() for every network with a mapping in rc_network_sock.
+ *
+ * \param msg An IRC quit message to send with the \c QUIT command
+ *
+ * \return 0 on success.
+ * \return -1 on failure to gracefully disconnect from any network.
+ */
+int irc_disconnect_all(const char* msg, size_t len);
 
 /**
  * Joins a channel on the given IRC network. If \c channel is a valid handle in
@@ -101,7 +114,8 @@ int irc_channel_part(const char* network, const char* channel);
 
 /**
  * Sends a message of length \c len, read from buffer \c buf, to the given IRC
- * network. If the entire message cannot be sent, 
+ * network. If \c len exceeds \c MSG_SIZE_MAX, only the first \c MSG_SIZE_MAX
+ * characters of the message will be sent.
  *
  * \param network A string indexing a networkinfo struct in the rc_network hash
  * table.
@@ -117,7 +131,7 @@ int irc_msg_send(const char* network, const char* buf, size_t len);
  * Reads and removes a complete line, including terminating newline character,
  * from the message buffer for the given network.
  *
- * Note: \c buf must be at least \c MSG_SIZE chars in length, otherwise this
+ * Note: \c buf must be at least \c MSG_SIZE_MAX chars in length, otherwise this
  * function may cause a buffer overflow.
  *
  * \param network A string indexing a networkinfo struct in the rc_network hash

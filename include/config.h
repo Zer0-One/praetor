@@ -21,7 +21,7 @@
  * A pointer to the global struct containing praetor's daemon-specific
  * configuration.
  */
-extern struct praetorinfo* rc_praetor;
+extern struct praetor* rc_praetor;
 /**
  * Pointers to the global hash tables containing praetor's network-specific
  * configuration, indexed by the user-specified name of the network, and by
@@ -39,7 +39,7 @@ extern struct htable* rc_plugin, * rc_plugin_sock;
  * Contains the configuration options required for praetor to function as a
  * daemon.
  */
-struct praetorinfo{
+struct praetor{
     /**
      * The daemon will drop its user privileges from root to that of the
      * specified user.
@@ -65,6 +65,10 @@ struct plugin{
      * A handle for the plugin, to be used as an index in hash tables.
      */
     char* name;
+    /**
+     * The process ID of the child process spawned for this plugin.
+     */
+    pid_t pid;
     /**
      * The name of the plugin author, to be printed on calls to
      * plugin_get_author().
@@ -119,7 +123,7 @@ struct channel{
  * A struct that contains configuration options for connections to an IRC
  * network.
  */
-struct networkinfo{
+struct network{
     /**
      * A handle for the network, to be used as an index in hash tables.
      */
@@ -199,17 +203,18 @@ struct networkinfo{
 
 /**
  * Parses praetor's main configuration file, and returns the results into the
- * appropriate structs. Memory for these structs is allocated dynamically, and
- * does not need to be allocated before the call. All fields of the rc_praetor
- * struct are given sensible default values, and do not need to be specified by
- * the user unless the defaults need to be overridden.
+ * appropriate global objects. These are:
+ *     - rc_praetor (struct praetor)
+ *     - rc_network (struct htable)
+ *     - rc_plugin (struct htable)
+ * Memory for these structures must be allocated before calling this function.
+ * All fields of the rc_praetor struct are given default values, and do not
+ * need to be specified by the user unless the defaults need to be overridden.
  *
  * @param path The path to the main configuration file.
- * @param[out] rc_praetor A pointer to the struct in which praetor's main
- * configuration options are stored.
- * @param[out] rc_network A pointer to a hash table that maps network names to
- * networkinfo structs.
+ * \return 0 on success.
+ * \return -1 if the configuration could not be successfully loaded.
  */
-void loadconfig(char* path);
+int loadconfig(char* path);
 
 #endif

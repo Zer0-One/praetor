@@ -22,19 +22,19 @@
 #include "log.h"
 #include "hashtable.h"
 
-struct praetorinfo* rc_praetor;
+struct praetor* rc_praetor;
 struct htable* rc_network, * rc_network_sock;
 struct htable* rc_plugin, * rc_plugin_sock;
 
 json_t* root = NULL;
 
-void initconfig(struct praetorinfo* rc_praetor){
+void initconfig(struct praetor* rc_praetor){
     rc_praetor->user = "praetor";
     rc_praetor->group = "praetor";
     rc_praetor->workdir = "/var/lib/praetor";
 }
 
-void loadconfig(char* path){
+int loadconfig(char* path){
     srandom(time(NULL));
     json_error_t error;
     //if we're reloading the config, free the old one
@@ -45,7 +45,7 @@ void loadconfig(char* path){
     logmsg(LOG_DEBUG, "config: Loaded configuration file %s\n", path);
     if(root == NULL){
         logmsg(LOG_ERR, "config: %s at line %d, column %d\n", error.text, error.line, error.column);
-        _exit(-1);
+        return -1;
     }
 
     initconfig(rc_praetor);
@@ -54,7 +54,7 @@ void loadconfig(char* path){
     //Unpack and validate root object
     if(json_unpack_ex(root, &error, JSON_STRICT, "{s?o, s?o, s?o}", "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
-        _exit(-1);
+        return -1;
     }
 
     //Unpack and validate daemon configuration section
@@ -62,9 +62,9 @@ void loadconfig(char* path){
         logmsg(LOG_WARNING, "config: No daemon section, using default settings\n");
     }
     else{
-        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, "{s?s, s?s, s?s, s?s}", "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
+        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, "{s?s, s?s, s?s}", "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
             logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
-            _exit(-1);
+            return -1;
         }
     }
 
@@ -74,7 +74,7 @@ void loadconfig(char* path){
     }
     else if(!json_is_array(plugins_section)){
         logmsg(LOG_ERR, "config: plugins section must be an array\n");
-        _exit(-1);
+        return -1;
     }
     else{
         json_t* value;
@@ -83,11 +83,11 @@ void loadconfig(char* path){
             struct plugin* plugin_this = calloc(1, sizeof(struct plugin));
             if(plugin_this == NULL){
                 logmsg(LOG_ERR, "config: Cannot allocate memory for plugin configuration\n");
-                _exit(-1);
+                return -1;
             }
             if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s}", "name", &plugin_this->name, "path", &plugin_this->path) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
-                _exit(-1);
+                return -1;
             }
             htable_add(rc_plugin, plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
             logmsg(LOG_DEBUG, "config: Added configuration for plugin %s\n", plugin_this->name);
@@ -100,28 +100,28 @@ void loadconfig(char* path){
     }
     else if(!json_is_array(networks_section)){
         logmsg(LOG_ERR, "config: networks section must be an array\n");
-        _exit(-1);
+        return -1;
     }
     else{
         json_t* value, *channel_value, *channels, *admins, *plugins;
         size_t index, channel_index;
         json_array_foreach(networks_section, index, value){
             //create a fresh networkinfo struct for each network
-            struct networkinfo* networkinfo_this = calloc(1, sizeof(struct networkinfo));
-            if(networkinfo_this == NULL){
+            struct network* network_this = calloc(1, sizeof(struct network));
+            if(network_this == NULL){
                 logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
-                _exit(-1);
+                return -1;
             }
             //instantiate hash tables for this network
-            networkinfo_this->channels = htable_create(10);
-            networkinfo_this->plugins = htable_create(10);
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}", "name", &networkinfo_this->name, "host", &networkinfo_this->host, "ssl", &networkinfo_this->ssl, "nick", &networkinfo_this->nick, "alt_nick", &networkinfo_this->alt_nick, "user", &networkinfo_this->user, "real_name", &networkinfo_this->real_name, "quit_msg", &networkinfo_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
+            network_this->channels = htable_create(10);
+            network_this->plugins = htable_create(10);
+            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}", "name", &network_this->name, "host", &network_this->host, "ssl", &network_this->ssl, "nick", &network_this->nick, "alt_nick", &network_this->alt_nick, "user", &network_this->user, "real_name", &network_this->real_name, "quit_msg", &network_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
-                _exit(-1);
+                return -1;
             }
             //add this networkinfo to the global hash table, indexed by its name
-            htable_add(rc_network, networkinfo_this->name, strlen(networkinfo_this->name)+1, networkinfo_this);
-            logmsg(LOG_DEBUG, "config: Added configuration for network %s\n", networkinfo_this->name);
+            htable_add(rc_network, network_this->name, strlen(network_this->name)+1, network_this);
+            logmsg(LOG_DEBUG, "config: Added configuration for network %s\n", network_this->name);
         
 
             //Unpack and validate plugins configuration section for this network
@@ -130,7 +130,7 @@ void loadconfig(char* path){
             }
             else if(!json_is_array(plugins)){
                 logmsg(LOG_ERR, "config: networks section must be an array\n");
-                _exit(-1);
+                return -1;
             }
             else{
                 //This is where I'd be parsing the plugins section for the network
@@ -142,7 +142,7 @@ void loadconfig(char* path){
             }
             else if(!json_is_array(admins)){
                 logmsg(LOG_ERR, "config: admins section must be an array\n");
-                _exit(-1);
+                return -1;
             }
             else{
                 //This is where I'd be parsing the admins section for the network
@@ -154,23 +154,25 @@ void loadconfig(char* path){
             }
             else if(!json_is_array(channels)){
                 logmsg(LOG_ERR, "config: channels section must be an array\n");
-                _exit(-1);
+                return -1;
             }
             else{
                 json_array_foreach(channels, channel_index, channel_value){
                     struct channel* channel_this = calloc(1, sizeof(struct channel));
                     if(channel_this == NULL){
                         logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
-                        _exit(-1);
+                        return -1;
                     }
                     if(json_unpack_ex(channel_value, &error, JSON_STRICT, "{s:s, s?s}", "name", &channel_this->name, "password", &channel_this->password) == -1){
                         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
-                        _exit(-1);
+                        return -1;
                     }
-                    htable_add(networkinfo_this->channels, channel_this->name, strlen(channel_this->name)+1, channel_this);
-                    logmsg(LOG_DEBUG, "config: Added channel %s to network %s\n", channel_this->name, networkinfo_this->name);
+                    htable_add(network_this->channels, channel_this->name, strlen(channel_this->name)+1, channel_this);
+                    logmsg(LOG_DEBUG, "config: Added channel %s to network %s\n", channel_this->name, network_this->name);
                 }
             }
         }
     }
+
+    return 0;
 }

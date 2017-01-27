@@ -14,12 +14,12 @@
 #include <fcntl.h>
 #include <jansson.h>
 #include <openssl/opensslv.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "config.h"
 #include "daemonize.h"
 #include "hashtable.h"
@@ -27,7 +27,7 @@
 #include "log.h"
 #include "nexus.h"
 #include "plugin.h"
-//#include "sighandlers.h"
+#include "signals.h"
 
 /**
  * Prints command-line application usage information.
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]){
     logmsg(LOG_DEBUG, "main: Config file path = %s\n", config_path);
 
     //allocate space for various configuration
-    if((rc_praetor = calloc(1, sizeof(struct praetorinfo))) == NULL){
+    if((rc_praetor = calloc(1, sizeof(struct praetor))) == NULL){
         logmsg(LOG_ERR, "main: Cannot allocate memory for daemon configuration\n");
         _exit(-1);
     }
@@ -91,11 +91,21 @@ int main(int argc, char* argv[]){
     rc_plugin_sock = htable_create(5);
 
     //load configuration
-    loadconfig(config_path);
+    if(loadconfig(config_path) == -1){
+        _exit(-1);
+    }
 
     //daemonize
     if(!foreground){
-        daemonize(rc_praetor->workdir, rc_praetor->user, rc_praetor->group);
+        if(daemonize(rc_praetor->workdir, rc_praetor->user, rc_praetor->group) == -1){
+            _exit(-1);
+        }
+    }
+
+    //install signal handlers
+    if(signal_init() < 0){
+        logmsg(LOG_ERR, "main: Could not install signal handlers\n");
+        _exit(-1);
     }
 
     //load plugins
