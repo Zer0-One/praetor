@@ -6,10 +6,10 @@
 
 [![Build Status](https://build.zer0-one.net/buildStatus/icon?job=praetor_release_linux_x86-64)](https://build.zer0-one.net/job/praetor_release_linux_x86-64/)
 
-An IRC bot designed to be fast, robust, portable, and easily extensible. Unlike
-other bots, praetor is written in C for efficiency, conforms closely to the
-SUSv3 for maximum portability, and uses a language-neutral IPC approach to
-allow you to write plugins in any language you like.
+An IRC bot designed to be robust, portable, and easily extensible. Unlike other
+bots, praetor is written in C for efficiency, conforms closely to the SUSv3 for
+maximum portability, and uses a language-neutral IPC approach to allow you to
+write plugins in any language you like.
 
 Information regarding usage can be found in the manual page.
 
@@ -41,25 +41,8 @@ Makefile targets         | Description
 
 ## Installation
 
-No packages yet.
-
-## To-Do
-
-The current to-do list:
-
-- [ ] Implement praetor as a daemon, complete with init scripts for OpenRC, systemd, etc.
-- [ ] Implement a unit testing framework
-- [ ] Create a JSON config file format, parse it into usable structures
-- [ ] Implement IRC client functionality
-- [ ] Write a language-independent plugin system
-- [ ] Create a basic set of fun plugins in different languages, to demonstrate
-  user's ability to write plugins in any language they like
-    - [ ] ddate, announces the ddate at midnight
-    - [ ] markov, a markov-chain based chat application
-    - [ ] sed, performs sed replacements on previous messages
-    - [ ] acronym, deciphers unknown acronyms
-- [ ] Implement functionality to automatically generate praetor's configuration
-  based on an interactive IRC session with an admin user
+No packages yet; you'll have to build it yourself. Once praetor is stable, I'll
+create packages for every major distro.
 
 ## License
 

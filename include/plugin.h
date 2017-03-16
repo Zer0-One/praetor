@@ -65,6 +65,12 @@ int plugin_unload_all();
 int plugin_reload(const char* name);
 
 /**
+ * Calls plugin_reload() for every plugin currently loaded and indexed by the
+ * rc_plugin hash table.
+ */
+int plugin_reload_all();
+
+/**
  * Returns a pointer to the name of the plugin author(s).
  */
 const char* plugin_get_author(const char* name);

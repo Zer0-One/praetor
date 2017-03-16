@@ -60,7 +60,7 @@ int irc_register_connection(const char* network);
 /**
  * Attempts a graceful disconnect from an IRC network. This function is
  * guaranteed to disconnect praetor from the given IRC network by performing an
- * IRC QUIT, and terminating the socket connection; it does so gracefully if
+ * IRC \c QUIT, and terminating the socket connection; it does so gracefully if
  * possible, and ungracefully if necessary. This function also removes the
  * socket file descriptor belonging to the given network from the global
  * watchlist.
@@ -77,13 +77,13 @@ int irc_disconnect(const char* network, const char* msg, size_t len);
 
 /**
  * Calls irc_disconnect() for every network with a mapping in rc_network_sock.
- *
- * \param msg An IRC quit message to send with the \c QUIT command
+ * The value specified with the "quit_msg" configuration option is used as the
+ * IRC \c QUIT message in each network for which the option was specified.
  *
  * \return 0 on success.
  * \return -1 on failure to gracefully disconnect from any network.
  */
-int irc_disconnect_all(const char* msg, size_t len);
+int irc_disconnect_all();
 
 /**
  * Joins a channel on the given IRC network. If \c channel is a valid handle in

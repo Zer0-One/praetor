@@ -59,7 +59,7 @@
             "alt_nick": "shazbot??",
             "user": "shazbot",
             "real_name": "shazbot",
-            "quit_msg": "",
+            "quit_msg": "this is a quit message",
             "channels": [
                 {
                     "name": "#test1"

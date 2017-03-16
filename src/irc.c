@@ -47,11 +47,11 @@ int irc_connect(const char* network){
         port = strtok(NULL, ":");
     }
     
-    for(int i = 0; i < MAX_CONNECT_RETRY; i++){
+    for(size_t i = 0; i < MAX_CONNECT_RETRY; i++){
         if((n->sock = inet_connect(host, port)) != -1){
             break;
         }
-        logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', connection attempt #%d\n", network, i);
+        logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', connection attempt #%zd\n", network, i);
     }
     if(n->sock == -1){
         logmsg(LOG_WARNING, "irc: Failed to connect to IRC network '%s'\n", network);
@@ -183,7 +183,7 @@ int irc_disconnect(const char* network, const char* msg, size_t len){
     return 0;
 }
 
-int irc_disconnect_all(const char* msg, size_t len){
+int irc_disconnect_all(){
     struct list* networks = htable_get_keys(rc_network_sock, false);
 
     if(networks == NULL){
@@ -195,7 +195,7 @@ int irc_disconnect_all(const char* msg, size_t len){
     int ret = 0;
     for(struct list* this = networks; this != 0; this = this->next){
         struct network* n = htable_lookup(rc_network_sock, this->key, this->size);
-        if(irc_disconnect(n->name, msg, len) < 0){
+        if(irc_disconnect(n->name, n->quit_msg, strlen(n->quit_msg)) < 0){
             ret = -1;
         }
     }

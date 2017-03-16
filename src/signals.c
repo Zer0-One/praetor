@@ -17,31 +17,22 @@
 
 #include "irc.h"
 #include "log.h"
+#include "nexus.h"
 
-void signal_handle_sigchld(int sig){
-    //NOTE: multiple children may have terminated, so handle *all* of them
-    //log the exit status of the child.
-    /**
-     * run clean-up. remove fds from watch-list, remove entry from
-     * rc_plugin_sock, and close UNIX domain sockets for the plugin.
-     */
-    //should probably not touch global state here. set a flag, handle all of this somewhere along the original thread of execution
+void signal_handle_sigchld(){
+    sigchld = 1;
 }
 
-void signal_handle_sighup(int sig){
-    //handle re-initialization of the daemon    
+void signal_handle_sighup(){
+    sighup = 1;
 }
 
-void signal_handle_sigpipe(int sig){
-    //handle remote end of a socket hanging up unexpectedly (for both plugins and networks)
-    //    - clean up (kill the plugin process) and attempt to re-connect (re-start the plugin)
-    //    - if reconnect fails, give up (admin can attempt to initiate another connection via IRC)
+void signal_handle_sigpipe(){
+    sigpipe = 1;
 }
 
-void signal_handle_sigterm(int sig){
-    //allow the user to specify a quit message?
-    irc_disconnect_all(NULL, 0);
-    _exit(0);
+void signal_handle_sigterm(){
+    sigterm = 1;
 }
 
 int signal_init(){

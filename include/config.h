@@ -70,6 +70,10 @@ struct plugin{
      */
     pid_t pid;
     /**
+     * Praetor's end of the socket pair for this plugin.
+     */
+    int sock;
+    /**
      * The name of the plugin author, to be printed on calls to
      * plugin_get_author().
      */

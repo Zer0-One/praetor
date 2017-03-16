@@ -109,7 +109,7 @@ uint32_t hash(const char* key, size_t len){
 }
 
 void free_buckets(struct htable_data* bucket_array, size_t bucket_count){
-    for(int i = 0; i < bucket_count; i++){
+    for(size_t i = 0; i < bucket_count; i++){
         if(bucket_array[i].next != 0){
             struct htable_data* entry = bucket_array[i].next;
             do{
@@ -129,7 +129,7 @@ int htable_rehash(struct htable* table){
     if(table->bucket_array == NULL){
         return -1;
     }
-    for(int i = 0; i < table->bucket_count/2; i++){
+    for(size_t i = 0; i < table->bucket_count/2; i++){
         struct htable_data* entry = &tmp_buckets[i];
         while(entry != 0){
             //we skip empty links, and add filled ones to the new bucket array
@@ -147,7 +147,7 @@ int htable_rehash(struct htable* table){
     return 0;
 }
 
-int htable_data_write(struct htable* table, struct htable_data* entry, const void* key, size_t key_len, void* value){
+int htable_data_write(struct htable_data* entry, const void* key, size_t key_len, void* value){
     entry->key = calloc(key_len, sizeof(char));
     if(entry->key == NULL){
         entry->key = 0;
@@ -172,7 +172,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
     while(entry->next != 0){
         entry = entry->next;
         if(entry->key == 0){
-            if(htable_data_write(table, entry, key, key_len, value) == -1){
+            if(htable_data_write(entry, key, key_len, value) == -1){
                 return -1;
             }
             goto load_check;
@@ -185,7 +185,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
         logmsg(LOG_ERR, "htable: Could not allocate enough memory to store mapping\n");
         return -1;
     }
-    if(htable_data_write(table, entry->next, key, key_len, value) == -1){
+    if(htable_data_write(entry->next, key, key_len, value) == -1){
         return -1;
     }
     
@@ -276,7 +276,7 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
         logmsg(LOG_ERR, "htable: Could not allocate memory for a new key list\n");
         return NULL;
     }
-    for(int i = 0; i < table->bucket_count; i++){
+    for(size_t i = 0; i < table->bucket_count; i++){
         for(struct htable_data* entry = &table->bucket_array[i]; entry != 0; entry = entry->next){
             if(entry->key != 0){
                 list_this->next = calloc(1, sizeof(struct list));
