@@ -17,8 +17,9 @@
  * Turns the calling process into a daemon.
  *
  * \param workdir The directory that will be used as the daemon's working directory
- * \param user The user with whose privileges the daemon will run
- * \param group The group with whose privileges the daemon will run
+ * \param user    The user with whose privileges the daemon will run
+ * \param group   The group with whose privileges the daemon will run
+ *
  * \return 0 on success.
  * \return -1 on error.
  */

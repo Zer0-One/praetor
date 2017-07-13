@@ -38,9 +38,9 @@ extern bool foreground;
  * under normal circumstances. Use the logmsg() macro instead.
  *
  * \param loglevel One of the set of log priorities defined in <syslog.h>. Do
- * \b not include the logging facility. This function will use the logging
- * facility defined by LOG_FACILITY by default.
- * \param msg A printf-style format string for the message to be logged
+ *                 \b not include the logging facility. This function will use the logging
+ *                 facility defined by LOG_FACILITY by default.
+ * \param msg      A printf-style format string for the message to be logged
  */
 void logprintf(int loglevel, char* msg, ...);
 

@@ -22,12 +22,14 @@
  * configuration.
  */
 extern struct praetor* rc_praetor;
+
 /**
  * Pointers to the global hash tables containing praetor's network-specific
  * configuration, indexed by the user-specified name of the network, and by
  * socket file descriptor, respectively.
  */
 extern struct htable* rc_network, * rc_network_sock;
+
 /**
  * Pointers to the global hash tables containing configuration for praetor's
  * loaded plugins, indexed by the user-specified name of the plugin, and by
@@ -197,12 +199,16 @@ struct network{
      * A buffer for the next message(s) from this network. At any given time,
      * this buffer may contain no full lines, or multiple lines.
      */
-    char* msg;
+    char* msgbuf;
+    /**
+     * The size of the message buffer.
+     */
+    size_t msgbuf_size;
     /**
      * An index one greater than the index of the last character in the message
      * buffer.
      */
-    int msg_pos;
+    size_t msgbuf_idx;
 };
 
 /**
@@ -215,7 +221,8 @@ struct network{
  * All fields of the rc_praetor struct are given default values, and do not
  * need to be specified by the user unless the defaults need to be overridden.
  *
- * @param path The path to the main configuration file.
+ * \param path The path to the main configuration file.
+ *
  * \return 0 on success.
  * \return -1 if the configuration could not be successfully loaded.
  */

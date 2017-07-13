@@ -11,6 +11,8 @@
 */
 
 #include <errno.h>
+#include <fcntl.h>
+#include <jansson.h>
 #include <libgen.h>
 #include <signal.h>
 #include <string.h>
@@ -67,9 +69,7 @@ int plugin_load(const char* plugin){
             
             if(htable_add(rc_plugin_sock, &fds[0], sizeof(fds[0]), p) < 0){
                 logmsg(LOG_WARNING, "plugin: Failed to map IPC socket to configuration for plugin '%s'\n", plugin);
-                close(fds[0]);
-                kill(p->pid, SIGTERM);
-                return -1;
+                goto fail;
             }
             if(watch_add(fds[0]) < 0){
                 logmsg(LOG_WARNING, "plugin: Failed to add plugin socket descriptor to watch-list for plugin '%s'\n", plugin);
@@ -78,11 +78,27 @@ int plugin_load(const char* plugin){
                     logmsg(LOG_ERR, "plugin: Software failure. Press left mouse button to continue. Guru Meditation #c4fe.b33f.b4b3\n");
                     _exit(-1);
                 }
-                kill(p->pid, SIGTERM);
-                return -1;
+                goto fail;
+            }
+
+            //If the socket isn't non-blocking, we can't read from it;
+            //otherwise, a single shitty plugin could hang the bot
+            int flags = fcntl(fds[0], F_GETFL);
+            if(flags == -1){
+                logmsg(LOG_WARNING, "plugin: Failed to get flags for plugin socket for plugin '%s', %s\n", plugin, strerror(errno));
+                goto fail;
+            }
+            if(fcntl(fds[0], F_SETFL, flags | O_NONBLOCK) == -1){
+                logmsg(LOG_WARNING, "plugin: Failed to put plugin socket into non-blocking mode for plugin '%s', %s\n", plugin, strerror(errno));
+                goto fail;
             }
 
             return fds[0];
+
+            fail:
+                close(fds[0]);
+                kill(p->pid, SIGTERM);
+                return -1;
     }
 }
 
@@ -142,4 +158,41 @@ int plugin_unload_all(){
     htable_key_list_free(plugins, false);
 
     return ret;
+}
+
+int plugin_reload(const char* plugin){
+    if(plugin_unload(plugin) != -1){
+        return plugin_load(plugin);
+    }
+
+    return -1;
+}
+
+int plugin_reload_all(){
+    if(plugin_unload_all() != -1){
+        return plugin_load_all();
+    }
+
+    return -1;
+}
+
+json_t* plugin_recv(const char* name){
+    struct plugin* p;
+    if((p = htable_lookup(rc_plugin, name, strlen(name)+1)) == NULL){
+        logmsg(LOG_WARNING, "plugin: No configuration found for plugin '%s'\n", name);
+        return NULL;
+    }
+   
+    json_error_t error;
+    json_t* msg = json_loadfd(p->sock, JSON_DISABLE_EOF_CHECK, &error);
+    //This covers malformed messages, and since the sockets are non-blocking, I
+    //*think* it covers hanging plugins as well (reads returning EAGAIN/EWOULDBLOCK).
+    if(msg == NULL){
+        logmsg(LOG_WARNING, "plugin: %s at Line: %d, Column: %d in message sent by plugin '%s'\n", error.text, error.line, error.column, name);
+        logmsg(LOG_WARNING, "plugin: Restarting plugin '%s' for bad behavior\n", name);
+        plugin_reload(name);
+        return NULL;
+    }
+
+    return msg;
 }

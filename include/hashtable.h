@@ -53,10 +53,11 @@ struct list{
  * mappings.
  *
  * \param size The initial size of the hash table. Space for \c size number of
- * \c buckets will be allocated. If \c size is set to 0, this function is
- * guaranteed to return NULL.
+ *             \c buckets will be allocated. If \c size is set to 0, this function is
+ *             guaranteed to return NULL.
+ *
  * \return A pointer to the newly created hash table, and NULL if either \c
- * size is 0, or the system is out of memory.
+ *         size is 0, or the system is out of memory.
  */
 struct htable* htable_create(size_t size);
 
@@ -75,11 +76,12 @@ void htable_destroy(struct htable* table);
  * already exists within the table, the function will return 1, and leave the
  * existing mapping unmodified.
  *
- * \param table The hash table to which the given key and value will be added.
- * \param key The key to index the specified value. This key will be copied
- * into the hash table via memcpy() for use in resolving hash collisions.
+ * \param table   The hash table to which the given key and value will be added.
+ * \param key     The key to index the specified value. This key will be copied
+ *                into the hash table via memcpy() for use in resolving hash collisions.
  * \param key_len The size, in char-sized units, of the \c key.
- * \param value The value to store in the specified hash table.
+ * \param value   The value to store in the specified hash table.
+ *
  * \return 0 on success.
  * \return -1 If the system is out of memory.
  * \return -2 If a mapping for the given key already exists.
@@ -89,10 +91,11 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
 /**
  * Removes a key-value pair from the specified hash table
  *
- * \param table The hash table from which the given key and value will be
- * removed.
- * \param key The key to index the specified value.
+ * \param table   The hash table from which the given key and value will be
+ *                removed.
+ * \param key     The key to index the specified value.
  * \param key_len The size, in char-sized units, of the \c key.
+ *
  * \return 0 on success.
  * \return -1 if the given key did not index any values.
  */
@@ -105,11 +108,12 @@ int htable_remove(struct htable* table, const void* key, size_t key_len);
  * key_len bytes. The given key must match the stored key exactly in both size
  * and content.
  *
- * \param table The hash table to be searched for the specified key.
- * \param key The key indexing the value being looked up.
+ * \param table   The hash table to be searched for the specified key.
+ * \param key     The key indexing the value being looked up.
  * \param key_len The size, in char-sized units, of the \c key.
+ *
  * \return A pointer to the mapped value on success, or NULL if no mapping for
- * \c key was found in the given hash table.
+ *         \c key was found in the given hash table.
  */
 void* htable_lookup(const struct htable* table, const void* key, size_t key_len);
 
@@ -118,10 +122,11 @@ void* htable_lookup(const struct htable* table, const void* key, size_t key_len)
  * The last link in the chain will have a \c next value of 0.
  *
  * \param deep If set to true, the returned linked list will contain copies of
- * the keys stored within this table instead of pointers to the keys stored
- * within the table.
+ *             the keys stored within this table instead of pointers to the keys stored
+ *             within the table.
+ *
  * \return A linked list of keys stored within the given hash table, or NULL if
- * the system is out of memory or if there are no entries in this hash table.
+ *         the system is out of memory or if there are no entries in this hash table.
  */
 struct list* htable_get_keys(const struct htable* table, bool deep);
 
@@ -129,11 +134,11 @@ struct list* htable_get_keys(const struct htable* table, bool deep);
  * Frees a linked list generated via a call to htable_get_keys().
  *
  * \param key_list The linked list of keys whose memory will be freed.
- * \param deep This value must match the value of \c deep passed to
- * htable_get_keys() to generate the linked list. If htable_get_keys() was
- * called with \c deep set to true, and this function is called with \c deep
- * set to false, memory will be leaked. If the opposite is true, behavior is
- * undefined.
+ * \param deep     This value must match the value of \c deep passed to
+ *                 htable_get_keys() to generate the linked list. If htable_get_keys() was
+ *                 called with \c deep set to true, and this function is called with \c deep
+ *                 set to false, memory will be leaked. If the opposite is true, behavior is
+ *                 undefined.
  */
 void htable_key_list_free(struct list* key_list, bool deep);
 
@@ -143,11 +148,16 @@ void htable_key_list_free(struct list* key_list, bool deep);
  * mappings, and \f$k\f$ is the number of buckets.
  *
  * \param table The table whose load factor will be calculated.
+ *
  * \return The calculated load factor of the specified hash table.
  */
 double htable_get_loadfactor(const struct htable* table);
 
 /**
+ * Returns the load factor at which the table will automatically resize itself.
+ *
+ * \param htable The table whose load factor threshold will be returned.
+ *
  * \return The current load factor threshold.
  */
 double htable_get_loadfactor_threshold(const struct htable* table);
@@ -158,7 +168,9 @@ double htable_get_loadfactor_threshold(const struct htable* table);
  * will double in size with every addition. If the given threshold is larger
  * than 1, performance of the hash table may be severely degraded.
  *
- * \param table The table whose load factor threshold will be set.
+ * \param table     The table whose load factor threshold will be set.
+ * \param threshold The load factor at which the table will automatically
+ *                  resize itself.
  */
 void htable_set_loadfactor_threshold(struct htable* table, double threshold);
 

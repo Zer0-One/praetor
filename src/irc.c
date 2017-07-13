@@ -39,7 +39,7 @@ int irc_connect(const char* network){
     if(strstr(n->host, ":") != NULL){
         //strtok modifies its argument, so make a copy
         if((tmp = calloc(1, strlen(n->host)+1)) == NULL){
-            logmsg(LOG_WARNING, "irc: Out of memory, could not connect to IRC network '%s'\n", network);
+            logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', out of memory\n", network);
             return -3;
         }
         strcpy(tmp, n->host);
@@ -62,7 +62,7 @@ int irc_connect(const char* network){
 
     //if the "ssl" option is enabled for this network, establish a TLS connection
     if(n->ssl){
-        if((n->ctx = inet_tls_connect(n->sock, host)) == NULL){
+        if((n->ctx = inet_tls_upgrade(n->sock, host)) == NULL){
             free(tmp);
             return -1;
         }
@@ -71,15 +71,24 @@ int irc_connect(const char* network){
     free(tmp);
   
     //beyond this point, we will need a message buffer for this network
-    if((n->msg = calloc(512, sizeof(char))) == NULL){
-        irc_disconnect(network, n->quit_msg, strlen(n->quit_msg));
-        logmsg(LOG_WARNING, "irc: Out of memory, could not connect to IRC network '%s'\n", network);
+    if((n->msgbuf = calloc(MSG_SIZE_MAX, sizeof(char))) == NULL){
+        irc_disconnect(network);
+        logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', the system is out of memory\n", network);
         return -1;
     }
-    n->msg_pos = 0;
+    n->msgbuf_idx = 0;
+    n->msgbuf_size = MSG_SIZE_MAX;
 
     //map the socket to the irc network config
-    htable_add(rc_network_sock, &n->sock, sizeof(n->sock), n);
+    int ret = htable_add(rc_network_sock, &n->sock, sizeof(n->sock), n);
+    if(ret == -1){
+        logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', the system is out of memory\n", network);
+        return -3;
+    }
+    if(ret == -2){
+        logmsg(LOG_WARNING, "irc: Could not connect to IRC network '%s', a mapping already exists for this network\n", network);
+        return -2;
+    }
 
     //add the socket to the global watchlist
     if(watch_add(n->sock) == -1){
@@ -91,14 +100,14 @@ int irc_connect(const char* network){
 
     //register an IRC connection
     if(irc_register_connection(network) == -1){
-        irc_disconnect(network, n->quit_msg, strlen(n->quit_msg));
+        irc_disconnect(network);
         return -3;
     }
 
     //connect to all channels
     struct list* channels = htable_get_keys(n->channels, false);
     if(channels == NULL){
-        logmsg(LOG_WARNING, "irc: Failed to load list of configured channels for network: %s", n->name);
+        logmsg(LOG_WARNING, "irc: Failed to load list of configured channels for network: %s\n", n->name);
         logmsg(LOG_WARNING, "irc: Network: %s has no configured channels, or the system is out of memory\n", n->name);
         return n->sock;
     }
@@ -140,13 +149,13 @@ int irc_register_connection(const char* network){
     int count;
     count = snprintf(buf, MSG_SIZE_MAX, "NICK %s\r\n", n->nick);
     if(irc_msg_send(network, buf, count) == -1){
-        logmsg(LOG_WARNING, "irc: Could not register connection with network %s\n", n->name);
+        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", n->name);
         return -1;
     }
     //handle_numeric()
     count = snprintf(buf, MSG_SIZE_MAX, "USER %s 8 * :%s\r\n", n->user, n->real_name);
     if(irc_msg_send(network, buf, count) == -1){
-        logmsg(LOG_WARNING, "irc: Could not register connection with network %s\n", n->name);
+        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", n->name);
         return -1;
     }
     //handle_numeric()
@@ -154,7 +163,7 @@ int irc_register_connection(const char* network){
     return 0;
 }
 
-int irc_disconnect(const char* network, const char* msg, size_t len){
+int irc_disconnect(const char* network){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
         logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
@@ -162,20 +171,20 @@ int irc_disconnect(const char* network, const char* msg, size_t len){
     }
 
     char buf[MSG_SIZE_MAX];
-    if(msg != NULL){
-        int count = snprintf(buf, MSG_SIZE_MAX, "QUIT :%.*s\r\n", (int)len, msg);
+    if(n->quit_msg != NULL){
+        int count = snprintf(buf, MSG_SIZE_MAX, "QUIT :%s\r\n", n->quit_msg);
         if(irc_msg_send(network, buf, count) == -1){
-            logmsg(LOG_WARNING, "irc: Could not quit from network %s\n", n->name);
+            logmsg(LOG_WARNING, "irc: Could not quit from network '%s'\n", n->name);
         }
     }
     else{
         if(irc_msg_send(network, "QUIT", 4) == -1){
-            logmsg(LOG_WARNING, "irc: Could not quit from network %s\n", n->name);
+            logmsg(LOG_WARNING, "irc: Could not quit from network '%s'\n", n->name);
         }
     }
 
     if(close(n->sock) == -1){
-        logmsg(LOG_WARNING, "irc: Could not disconnect from network %s\n", n->name);
+        logmsg(LOG_WARNING, "irc: Could not disconnect from network '%s'\n", n->name);
     }
     watch_remove(n->sock);
     htable_remove(rc_network_sock, &n->sock, sizeof(n->sock));
@@ -195,7 +204,7 @@ int irc_disconnect_all(){
     int ret = 0;
     for(struct list* this = networks; this != 0; this = this->next){
         struct network* n = htable_lookup(rc_network_sock, this->key, this->size);
-        if(irc_disconnect(n->name, n->quit_msg, strlen(n->quit_msg)) < 0){
+        if(irc_disconnect(n->name) < 0){
             ret = -1;
         }
     }
@@ -229,7 +238,7 @@ int irc_channel_join(const char* network, const char* channel){
     }
 
     if(irc_msg_send(network, buf, count) == -1){
-        logmsg(LOG_WARNING, "irc: Could not join channel %s on network %s\n", channel, n->name);
+        logmsg(LOG_WARNING, "irc: Could not join channel '%s' on network '%s'\n", channel, n->name);
         return -1;
     }
     
@@ -246,13 +255,14 @@ int irc_channel_part(const char* network, const char* channel){
     char buf[MSG_SIZE_MAX];
     int count = snprintf(buf, MSG_SIZE_MAX, "PART %s\r\n", channel);
     if(irc_msg_send(network, buf, count) == -1){
-        logmsg(LOG_WARNING, "irc: Could not part channel %s on network %s\n", channel, n->name);
+        logmsg(LOG_WARNING, "irc: Could not part channel '%s' on network '%s'\n", channel, n->name);
         return -1;
     }
     
     return 0;
 }
 
+//To-Do: Add debug logging to display sent messages
 int irc_msg_send(const char* network, const char* buf, size_t len){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
@@ -264,13 +274,13 @@ int irc_msg_send(const char* network, const char* buf, size_t len){
     if(n->ssl){
         if(len < MSG_SIZE_MAX){
             if((count = tls_write(n->ctx, buf, len)) == -1){
-                logmsg(LOG_WARNING, "irc: Could not send message on %s, %s\n", n->name, tls_error(n->ctx));
+                logmsg(LOG_WARNING, "irc: Could not send message on network '%s', %s\n", n->name, tls_error(n->ctx));
                 return -1;
             }
         }
         else{
             if((count = tls_write(n->ctx, buf, MSG_SIZE_MAX)) == -1){
-                logmsg(LOG_WARNING, "irc: Could not send message on %s, %s\n", n->name, tls_error(n->ctx));
+                logmsg(LOG_WARNING, "irc: Could not send message on network '%s', %s\n", n->name, tls_error(n->ctx));
                 return -1;
             }
             logmsg(LOG_WARNING, "irc: Message to network '%s' truncated; size exceeded 512 characters.\n", n->name);
@@ -280,13 +290,13 @@ int irc_msg_send(const char* network, const char* buf, size_t len){
 
     if(len < MSG_SIZE_MAX){
         if((count = send(n->sock, buf, len, 0)) == -1){
-            logmsg(LOG_WARNING, "irc: Could not send message on %s, %s\n", n->name, strerror(errno));
+            logmsg(LOG_WARNING, "irc: Could not send message on network '%s', %s\n", n->name, strerror(errno));
             return -1;
         }
     }
     else{
         if((count = send(n->sock, buf, MSG_SIZE_MAX, 0)) == -1){
-            logmsg(LOG_WARNING, "irc: Could not send message on %s, %s\n", n->name, strerror(errno));
+            logmsg(LOG_WARNING, "irc: Could not send message on network '%s', %s\n", n->name, strerror(errno));
             return -1;
         }
         logmsg(LOG_WARNING, "irc: Message to network '%s' truncated; size exceeded 512 characters.\n", n->name);
@@ -295,29 +305,56 @@ int irc_msg_send(const char* network, const char* buf, size_t len){
     return count;
 }
 
-ssize_t irc_msg_recv(const char* network, char* buf, size_t len){
-    if(len < MSG_SIZE_MAX){
-        logmsg(LOG_DEBUG, "irc: Message buffer too small to receive IRC message\n");
-        return -1;
-    }
-    
+ssize_t irc_msg_recv(const char* network){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
         logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
-        return -1;
-    }
-
-    char* line_end;
-    if((line_end = memchr(n->msg, '\n', n->msg_pos)) == NULL){
-        return -1;
+        return 0;
     }
     
-    size_t char_count = line_end - n->msg + 1;
-    strncpy(buf, n->msg, char_count);
-    memmove(n->msg, line_end + 1, MSG_SIZE_MAX - char_count);
-    n->msg_pos = (n->msg + n->msg_pos) - line_end - 1;
+    if(n->msgbuf_size < MSG_SIZE_MAX){
+        logmsg(LOG_ERR, "irc: Message buffer for network '%s' too small to receive IRC messages\n", network);
+        _exit(-1);
+    }
 
-    return char_count;
+    size_t bytes_to_read = n->msgbuf_size - n->msgbuf_idx;
+
+    ssize_t ret;
+    if(n->ssl){
+        ret = tls_read(n->ctx, n->msgbuf + n->msgbuf_idx, bytes_to_read);
+        if(ret == -1){
+            logmsg(LOG_WARNING, "irc: Could not read from network '%s', %s\n", network, tls_error(n->ctx));
+            //I do this check for a shutdown socket because idk how the fuck to get this from libtls
+            char c;
+            if(recv(n->sock, &c, 1, MSG_PEEK) == 0){
+                goto server_reconnect;
+            }
+            return -1;
+        }
+    }
+    else{
+        ret = recv(n->sock, n->msgbuf + n->msgbuf_idx, bytes_to_read, 0);
+        if(ret == -1){
+            logmsg(LOG_WARNING, "irc: Could not read from network '%s', %s\n", network, strerror(errno));
+            return -1;
+        }
+        if(ret == 0){
+            goto server_reconnect;
+        }
+    }
+
+    n->msgbuf_idx += ret;
+    return 0;
+
+    server_reconnect:
+        watch_remove(n->sock);
+        htable_remove(rc_network_sock, &n->sock, sizeof(n->sock));
+
+        memset(n->msgbuf, '\0', n->msgbuf_size);
+        n->msgbuf_idx = 0;
+
+        irc_connect(network);
+        return -2;
 }
 
 int irc_handle_ping(const char* network, const char* buf, size_t len){
@@ -333,3 +370,7 @@ int irc_handle_ping(const char* network, const char* buf, size_t len){
 
     return 0;
 }
+
+//size_t irc_msg_from_json(json_t* json_msg, char*** irc_msg){
+//    return 0;
+//}

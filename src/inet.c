@@ -32,37 +32,37 @@ int inet_connect(const char* host, const char* service){
     hints.ai_socktype = SOCK_STREAM;
     int s = getaddrinfo(host, service, &hints, &result);
     if(s != 0){
-        logmsg(LOG_WARNING, "inet: Could not get address info for host %s, %s\n", host, gai_strerror(s));
+        logmsg(LOG_WARNING, "inet: Could not get address info for host '%s', %s\n", host, gai_strerror(s));
         return -1;
     }
     int sock = 0;
     for(; result != NULL; result = result->ai_next){
         sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
         if(sock == -1){
-            logmsg(LOG_DEBUG, "inet: Could not open socket for host %s, %s\n", host, strerror(errno));
+            logmsg(LOG_DEBUG, "inet: Could not open socket for host '%s', %s\n", host, strerror(errno));
             continue;
         }
         if(connect(sock, result->ai_addr, result->ai_addrlen) != -1){
             break;
         }
-        logmsg(LOG_WARNING, "inet: Could not connect to host %s, %s\n", host, strerror(errno));
+        logmsg(LOG_WARNING, "inet: Could not connect to host '%s', %s\n", host, strerror(errno));
         close(sock);
     }
     //put the socket fd into non-blocking mode
-    //int flags;
-    //if((flags = fcntl(sock, F_GETFL, 0)) == -1){
-    //    logmsg(LOG_DEBUG, "inet: Could not get socket file descriptor flags for host %s, %s\n", host, strerror(errno));
-    //    return -1;
-    //}
-    //if(fcntl(sock, F_SETFL, flags | O_NONBLOCK)){
-    //    logmsg(LOG_DEBUG, "inet: Could not set socket file descriptor flags for host %s, %s\n", host, strerror(errno));
-    //    return -1;
-    //}
+    int flags = fcntl(sock, F_GETFL);
+    if(flags == -1){
+        logmsg(LOG_DEBUG, "inet: Could not get socket file descriptor flags for host '%s', %s\n", host, strerror(errno));
+        return -1;
+    }
+    if(fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1){
+        logmsg(LOG_DEBUG, "inet: Could not set socket file descriptor flags for host '%s', %s\n", host, strerror(errno));
+        return -1;
+    }
     freeaddrinfo(result);
     return (result == NULL) ? -1 : sock;
 }
 
-struct tls* inet_tls_connect(int sock, const char* host){
+struct tls* inet_tls_upgrade(int sock, const char* host){
     tls_init();
     struct tls_config* cfg;
     struct tls* ctx;

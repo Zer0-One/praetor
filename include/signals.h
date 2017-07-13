@@ -13,6 +13,13 @@
 #ifndef PRAETOR_SIGNAL
 #define PRAETOR_SIGNAL
 
+#include <signal.h>
+
+extern volatile sig_atomic_t sigchld;
+extern volatile sig_atomic_t sighup;
+extern volatile sig_atomic_t sigpipe;
+extern volatile sig_atomic_t sigterm;
+
 /**
  * Sets signal disposition and installs handlers for:
  *     - SIGCHLD
@@ -24,5 +31,10 @@
  * \return -1 on error.
  */
 int signal_init();
+
+int sigchld_handler();
+int sighup_handler();
+int sigpipe_handler();
+int sigterm_handler();
 
 #endif

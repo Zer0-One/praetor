@@ -13,18 +13,12 @@
 #ifndef PRAETOR_NEXUS
 #define PRAETOR_NEXUS
 
-#include <signal.h>
-
-extern volatile sig_atomic_t sigchld;
-extern volatile sig_atomic_t sighup;
-extern volatile sig_atomic_t sigpipe;
-extern volatile sig_atomic_t sigterm;
-
 /**
  * Adds a file descriptor to the global file descriptor monitor list by
  * wrapping it in a pollfd struct.
  *
  * \param fd A valid file descriptor.
+ *
  * \return 0 if the file descriptor was successfully added to the monitor list.
  * \return -1 on an out-of-memory condition.
  */

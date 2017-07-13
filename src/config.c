@@ -22,6 +22,12 @@
 #include "log.h"
 #include "hashtable.h"
 
+#define SCHEMA_CHANNELS "{s:s, s?s}"
+#define SCHEMA_DAEMON "{s?s, s?s, s?s}"
+#define SCHEMA_NETWORKS "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}"
+#define SCHEMA_PLUGINS "{s:s, s:s}"
+#define SCHEMA_ROOT "{s?o, s?o, s?o}"
+
 struct praetor* rc_praetor;
 struct htable* rc_network, * rc_network_sock;
 struct htable* rc_plugin, * rc_plugin_sock;
@@ -52,7 +58,7 @@ int loadconfig(char* path){
     json_t* daemon_section = NULL, *networks_section = NULL, *plugins_section;
     
     //Unpack and validate root object
-    if(json_unpack_ex(root, &error, JSON_STRICT, "{s?o, s?o, s?o}", "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
+    if(json_unpack_ex(root, &error, JSON_STRICT, SCHEMA_ROOT, "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
         return -1;
     }
@@ -62,7 +68,7 @@ int loadconfig(char* path){
         logmsg(LOG_WARNING, "config: No daemon section, using default settings\n");
     }
     else{
-        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, "{s?s, s?s, s?s}", "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
+        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, SCHEMA_DAEMON, "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
             logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
             return -1;
         }
@@ -85,7 +91,7 @@ int loadconfig(char* path){
                 logmsg(LOG_ERR, "config: Cannot allocate memory for plugin configuration\n");
                 return -1;
             }
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s}", "name", &plugin_this->name, "path", &plugin_this->path) == -1){
+            if(json_unpack_ex(value, &error, JSON_STRICT, SCHEMA_PLUGINS, "name", &plugin_this->name, "path", &plugin_this->path) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 return -1;
             }
@@ -115,7 +121,7 @@ int loadconfig(char* path){
             //instantiate hash tables for this network
             network_this->channels = htable_create(10);
             network_this->plugins = htable_create(10);
-            if(json_unpack_ex(value, &error, JSON_STRICT, "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}", "name", &network_this->name, "host", &network_this->host, "ssl", &network_this->ssl, "nick", &network_this->nick, "alt_nick", &network_this->alt_nick, "user", &network_this->user, "real_name", &network_this->real_name, "quit_msg", &network_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
+            if(json_unpack_ex(value, &error, JSON_STRICT, SCHEMA_NETWORKS, "name", &network_this->name, "host", &network_this->host, "ssl", &network_this->ssl, "nick", &network_this->nick, "alt_nick", &network_this->alt_nick, "user", &network_this->user, "real_name", &network_this->real_name, "quit_msg", &network_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 return -1;
             }
@@ -163,7 +169,7 @@ int loadconfig(char* path){
                         logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
                         return -1;
                     }
-                    if(json_unpack_ex(channel_value, &error, JSON_STRICT, "{s:s, s?s}", "name", &channel_this->name, "password", &channel_this->password) == -1){
+                    if(json_unpack_ex(channel_value, &error, JSON_STRICT, SCHEMA_CHANNELS, "name", &channel_this->name, "password", &channel_this->password) == -1){
                         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                         return -1;
                     }
