@@ -12,18 +12,19 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <jansson.h>
-#include <openssl/opensslv.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <jansson.h>
+#include <openssl/opensslv.h>
+
 #include "config.h"
 #include "daemonize.h"
 #include "hashtable.h"
-#include "irc.h"
+#include "inet.h"
 #include "log.h"
 #include "nexus.h"
 #include "plugin.h"
@@ -91,7 +92,7 @@ int main(int argc, char* argv[]){
     rc_plugin_sock = htable_create(5);
 
     //load configuration
-    if(loadconfig(config_path) == -1){
+    if(config_load(config_path) == -1){
         _exit(-1);
     }
 
@@ -114,8 +115,8 @@ int main(int argc, char* argv[]){
     }
 
     //connect to IRC
-    if(irc_connect_all() < 0){
-        logmsg(LOG_WARNING, "main: Could not connect to all IRC networks\n");
+    if(inet_connect_all() == -1){
+        logmsg(LOG_WARNING, "main: Could not connect to any IRC networks\n");
     }
 
     //main event loop

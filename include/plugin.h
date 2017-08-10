@@ -85,7 +85,7 @@ int plugin_reload_all();
  * \return A pointer to the received JSON object on success.
  * \return NULL if input could not be read successfully.
  */
-json_t* plugin_recv(const char* name);
+json_t* plugin_msg_recv(const char* name);
 
 /**
  * Returns a pointer to the name of the plugin author(s).

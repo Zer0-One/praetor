@@ -16,50 +16,10 @@
 #include <jansson.h>
 
 /**
- * The maximum size of an IRC message
+ * The maximum size of an IRC message.
  */
 #define MSG_SIZE_MAX 512
-
-/**
- * Establishes a socket connection to an IRC server, adds the connected socket
- * to the global watchlist, registers an IRC connection, and joins every
- * channel configured for the given network.
- *
- * Note: this function modifies global state. The \c networkinfo struct indexed
- * by the \c network argument is modified by setting its \c sock and \c ctx
- * pointers to their appropriate values.
- *
- * \param network A string indexing a networkinfo struct in the rc_network hash
- *                table.
- *
- * \return On success, this function returns a socket file descriptor. If the
- *         given network was configured for SSL/TLS, you should not attempt to write or
- *         read data via this descriptor directly; use the libtls API instead. 
- * \return -1 on failure to connect the socket.
- * \return -2 on failure to register an IRC connection.
- * \return -3 on failure due to an out-of-memory condition.
- */
-int irc_connect(const char* network);
-
-/**
- * Calls irc_connect() for every network defined in praetor's configuration.
- *
- * \return 0 on success
- * \return -1 if irc_connect() fails for any network.
- */
-int irc_connect_all();
-
-/**
- * Registers a connection with an IRC server by performing a PASS/NICK/USER
- * sequence (See RFC 2812, Section 3.1 for details).
- *
- * \param network A string indexing a networkinfo struct in the rc_network hash
- *                table.
- *
- * \return 0 upon successfully registering the connection
- * \return -1 on error.
- */
-int irc_register_connection(const char* network);
+#define MSG_BODY_MAX 510
 
 /**
  * Attempts a graceful disconnect from an IRC network. This function is
@@ -72,10 +32,10 @@ int irc_register_connection(const char* network);
  * \param network A string indexing a networkinfo struct in the rc_network hash
  *                table.
  *
- * \return 0 on a successful disconnect (graceful or not)
+ * \return 0 on a successful disconnect (graceful or not).
  * \return -1 if no configuration could be found for the given network handle.
  */
-int irc_disconnect(const char* network);
+//int irc_disconnect(const char* network);
 
 /**
  * Calls irc_disconnect() for every network with a mapping in rc_network_sock.
@@ -85,7 +45,7 @@ int irc_disconnect(const char* network);
  * \return 0 on success.
  * \return -1 on failure to gracefully disconnect from any network.
  */
-int irc_disconnect_all();
+//int irc_disconnect_all();
 
 /**
  * Joins a channel on the given IRC network. If \c channel is a valid handle in
@@ -102,7 +62,7 @@ int irc_disconnect_all();
  * \return 0 on a successful channel join
  * \return -1 on an unsuccessful join
  */
-int irc_channel_join(const char* network, const char* channel);
+//int irc_channel_join(const char* network, const char* channel);
 
 /**
  * Parts a channel on the given IRC network.
@@ -114,52 +74,7 @@ int irc_channel_join(const char* network, const char* channel);
  *
  * \return Something
  */
-int irc_channel_part(const char* network, const char* channel);
-
-/**
- * Sends a message of length \c len, read from buffer \c buf, to the given IRC
- * network. If \c len exceeds \c MSG_SIZE_MAX, only the first \c MSG_SIZE_MAX
- * characters of the message will be sent. The terminating carriage return and
- * newline should not be included in \c buf.
- *
- * \param network A string indexing a networkinfo struct in the rc_network hash
- *                table.
- * \param buf     The buffer that the message to send will be read from.
- * \param len     The length of the message to send.
- *
- * \return On success, returns the number of characters sent from the supplied
- *         buffer.
- * \return -1 on failure.
- */
-int irc_msg_send(const char* network, const char* buf, size_t len);
-
-/**
- * Reads input from an IRC network, and stores the input in the message buffer
- * for that network. This function always tries to fill the buffer completely,
- * as long as there is enough data available to read.
- *
- * If the IRC server has closed the connection, this function removes the
- * socket for this network from the global watchlist, removes its
- * rc_network_sock mapping, cleans up its message buffer, and then calls
- * irc_connect() to attempt to reconnect.
- *
- * \param network A string indexing a networkinfo struct in the rc_network hash table.
- *
- * \return On success, returns the number of characters in the first complete
- *         IRC message in the buffer.
- * \return 0 if a complete message could not be found in the buffer.
- * \return -1 if an error occurred.
- * \return -2 if the network closed the socket.
- */
-ssize_t irc_msg_recv(const char* network);
-
-/**
- * Processes the given message for a numeric code, and takes action
- * accordingly.
- *
- * \param msg An IRC message to scan for the presence of a numeric reply.
- */
-void irc_handle_numeric(const char* msg);
+//int irc_channel_part(const char* network, const char* channel);
 
 /**
  * Processes an IRC message for the presence of a PING, and sends the
@@ -179,7 +94,7 @@ void irc_handle_numeric(const char* msg);
  * \return 0 on success.
  * \return -1 on failure.
  */
-int irc_handle_ping(const char* network, const char* buf, size_t len);
+//int irc_handle_ping(const char* network, const char* buf, size_t len);
 
 /**
  * Transforms a JSON message generated by a plugin into one or more IRC
@@ -204,5 +119,34 @@ int irc_handle_ping(const char* network, const char* buf, size_t len);
  * \return -1 on failure.
  */
 //int irc_json_from_msg(json_t* json_msg, char*** irc_msg, size_t len);
+
+/**
+ * Registers a connection with an IRC server by performing a PASS/NICK/USER
+ * sequence (See RFC 2812, Section 3.1 for details).
+ *
+ * This function does not check to see if the server responded with an error.
+ * It only ensures that the message was sent.
+ * 
+ * \param network A string indexing a struct networkinfo in the rc_network hash
+ *                table.
+ *
+ * \return 0 on success.
+ * \return -1 on failure.
+ */
+int irc_register_connection(char* network);
+
+/**
+ * Builds an IRC message from the given format string.
+ *
+ * This function returns dynamically-allocated memory that should be freed by
+ * the caller.
+ *
+ * \param fmt A printf() format string describing an IRC message.
+ *
+ * \return On success, returns a pointer to dynamically-allocated memory which
+ *         should be freed when it is no longer needed.
+ * \return On failure, returns NULL.
+ */
+char* irc_msg_build(char* fmt, ...);
 
 #endif

@@ -138,6 +138,6 @@ int sigpipe_handler(){
 }
 
 void sigterm_handler(){
-    irc_disconnect_all();
+    //irc_disconnect_all();
     _exit(-1);
 }

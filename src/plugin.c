@@ -15,6 +15,7 @@
 #include <jansson.h>
 #include <libgen.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -71,8 +72,8 @@ int plugin_load(const char* plugin){
                 logmsg(LOG_WARNING, "plugin: Failed to map IPC socket to configuration for plugin '%s'\n", plugin);
                 goto fail;
             }
-            if(watch_add(fds[0]) < 0){
-                logmsg(LOG_WARNING, "plugin: Failed to add plugin socket descriptor to watch-list for plugin '%s'\n", plugin);
+            if(watch_add(fds[0], false) == -1){
+                logmsg(LOG_WARNING, "plugin: Failed to add plugin socket to global monitor list for plugin '%s'\n", plugin);
                 if(htable_remove(rc_plugin_sock, &fds[0], sizeof(fds[0])) != 0){
                     //If the index we just added doesn't exist, something's fucky
                     logmsg(LOG_ERR, "plugin: Software failure. Press left mouse button to continue. Guru Meditation #c4fe.b33f.b4b3\n");
@@ -125,11 +126,17 @@ int plugin_load_all(){
 
 int plugin_unload(const char* plugin){
     struct plugin* p = htable_lookup(rc_plugin, plugin, strlen(plugin)+1);
+    if(p == NULL){
+        logmsg(LOG_WARNING, "plugin: Could not unload plugin '%s', no such plugin loaded\n", plugin);
+        return -1;
+    }
 
     watch_remove(p->sock);
     if(htable_remove(rc_plugin_sock, &p->sock, sizeof(p->sock)) != 0){
-        logmsg(LOG_WARNING, "plugin: Could not unload plugin '%s', no such plugin loaded", plugin);
-        return -1;
+        //We had a plugin loaded, but that plugin had no socket connection
+        //This should never happen
+        logmsg(LOG_ERR, "plugin: Could not unmap socket for plugin '%s', no mapping exists\n", plugin);
+        _exit(-1);
     }
 
     if(kill(p->pid, SIGTERM) < 0){
@@ -176,7 +183,7 @@ int plugin_reload_all(){
     return -1;
 }
 
-json_t* plugin_recv(const char* name){
+json_t* plugin_msg_recv(const char* name){
     struct plugin* p;
     if((p = htable_lookup(rc_plugin, name, strlen(name)+1)) == NULL){
         logmsg(LOG_WARNING, "plugin: No configuration found for plugin '%s'\n", name);

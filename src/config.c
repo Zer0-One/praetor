@@ -11,12 +11,13 @@
 */
 
 #include <errno.h>
-#include <jansson.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <jansson.h>
 
 #include "config.h"
 #include "log.h"
@@ -40,7 +41,7 @@ void initconfig(struct praetor* rc_praetor){
     rc_praetor->workdir = "/var/lib/praetor";
 }
 
-int loadconfig(char* path){
+int config_load(char* path){
     srandom(time(NULL));
     json_error_t error;
     //if we're reloading the config, free the old one

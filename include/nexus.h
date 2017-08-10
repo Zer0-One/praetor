@@ -13,16 +13,21 @@
 #ifndef PRAETOR_NEXUS
 #define PRAETOR_NEXUS
 
+#include <stdbool.h>
+
 /**
  * Adds a file descriptor to the global file descriptor monitor list by
  * wrapping it in a pollfd struct.
  *
- * \param fd A valid file descriptor.
+ * \param fd         A valid file descriptor.
+ * \param connection If the given file descriptor is meant to be monitored for
+ * a completed connection (instead of monitored for messages waiting in the
+ * queue), this parameter should be set \c true.
  *
  * \return 0 if the file descriptor was successfully added to the monitor list.
  * \return -1 on an out-of-memory condition.
  */
-int watch_add(int fd);
+int watch_add(int fd, bool connection);
 
 /**
  * Removes a file descriptor from the global file descriptor monitor list.

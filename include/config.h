@@ -13,6 +13,8 @@
 #ifndef PRAETOR_CONFIG
 #define PRAETOR_CONFIG
 
+#include <netdb.h>
+#include <sys/socket.h>
 #include <stdbool.h>
 #include <tls.h>
 #include "hashtable.h"
@@ -192,6 +194,15 @@ struct network{
      */
     int sock;
     /**
+     * A list of struct addrinfo. praetor will connect using each until one
+     * succeeds.
+     */
+    struct addrinfo* addr;
+    /**
+     * The index of the current addrinfo struct being used.
+     */
+    size_t addr_idx;
+    /**
      * A libtls connection context.
      */
     struct tls* ctx;
@@ -226,6 +237,6 @@ struct network{
  * \return 0 on success.
  * \return -1 if the configuration could not be successfully loaded.
  */
-int loadconfig(char* path);
+int config_load(char* path);
 
 #endif

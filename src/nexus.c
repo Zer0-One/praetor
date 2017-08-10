@@ -11,7 +11,9 @@
 */
 
 #include <errno.h>
+#include <limits.h>
 #include <poll.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -38,24 +40,34 @@ size_t monitor_list_count = 0;
  */
 struct pollfd* monitor_list = NULL;
 
-int watch_add(const int fd){
+int watch_add(const int fd, bool connection){
     if(monitor_list != NULL){
         for(size_t i = 0; i < monitor_list_count; i++){
             if(monitor_list[i].fd == -1){
                 monitor_list[i].fd = fd;
-                monitor_list[i].events = POLLIN;
+                if(connection){
+                    monitor_list[i].events = POLLOUT;
+                }
+                else{
+                    monitor_list[i].events = POLLIN;
+                }
                 return 0;
             }
         }
     }
     void* tmp = realloc(monitor_list, (monitor_list_count+1) * sizeof(struct pollfd));
     if(tmp == NULL){
-        logmsg(LOG_WARNING, "nexus: Could not allocate space for struct pollfd, %s", strerror(errno));
+        logmsg(LOG_WARNING, "nexus: Could not add socket to global monitor list, %s\n", strerror(errno));
         return -1;
     }
     monitor_list = tmp;
     monitor_list[monitor_list_count].fd = fd;
-    monitor_list[monitor_list_count].events = POLLIN;
+    if(connection){
+        monitor_list[monitor_list_count].events = POLLOUT;
+    }
+    else{
+        monitor_list[monitor_list_count].events = POLLIN;
+    }
     monitor_list_count++;
     return 0;
 }
@@ -70,60 +82,109 @@ void watch_remove(const int fd){
     }
 }
 
+int handle_signals(){
+    sigset_t mask_set;
+    sigemptyset(&mask_set);
+
+    struct timespec ts = {.tv_sec = NOMEM_WAIT_SECONDS, .tv_nsec = NOMEM_WAIT_NANOSECONDS};
+    
+    /*
+     * If we receive SIGCHLD during handler execution, we might set
+     * sigchld = 0 without cleaning up a newly-terminated child.
+     * Setting the signal mask like this guards against that
+     * possibility. If the handler does clean up the newly-terminated
+     * child before the next time it's called, it'll safely return 0
+     * the next time it's called.
+     */
+    sigaddset(&mask_set, SIGCHLD);
+    sigaddset(&mask_set, SIGPIPE);
+    sigprocmask(SIG_BLOCK, &mask_set, NULL);
+    
+    //If any of these fail, we sleep for a quarter-second 
+    if(sigchld){
+        if(sigchld_handler() == -1){
+            nanosleep(&ts, NULL);
+            return -1;
+        }
+        sigchld = 0;
+    }
+    else if(sighup){
+        if(sighup_handler() == -1){
+            nanosleep(&ts, NULL);
+            return -1;
+        }
+        sighup = 0;
+    }
+    else if(sigpipe){
+        if(sigpipe_handler() == -1){
+            nanosleep(&ts, NULL);
+            return -1;
+        }
+        sigpipe = 0;
+    }
+    else if(sigterm){
+        sigterm_handler();
+    }
+        
+    sigprocmask(SIG_UNBLOCK, &mask_set, NULL);
+    sigemptyset(&mask_set);
+
+    return 0;
+}
+
+/**
+ * Verify that a non-blocking connect() completed successfully. On success,
+ * upgrade to a TLS connection (if necessary), and add the socket to the
+ * monitor list. On failure, move to the next addr and retry the connection.
+ */
+void check_connection(struct network* n){
+    int optval = INT_MAX;
+    socklen_t optlen = sizeof(optval);
+    if(getsockopt(n->sock, SOL_SOCKET, SO_ERROR, &optval, &optlen) == -1){
+        //This is never supposed to fail
+        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
+        _exit(-1);
+    }
+
+    if(optval == 0){
+        logmsg(LOG_DEBUG, "nexus: Connection to network '%s' was successful\n", n->name);
+        watch_remove(n->sock);
+
+        if(inet_tls_upgrade(n->name) == -1){
+            close(n->sock);
+            n->addr_idx++;
+        }
+
+        watch_add(n->sock, false);
+    }
+    else if(optval == INT_MAX){
+        //This is never supposed to happen
+        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
+        _exit(-1);
+    }
+    else{
+        logmsg(LOG_WARNING, "nexus: Connection to network '%s' was unsuccessful\n", n->name);
+        watch_remove(n->sock);
+        n->addr_idx++;
+        inet_connect(n->name);
+    }
+}
+
 void run(){
     if(monitor_list_count < 1){
         logmsg(LOG_ERR, "nexus: No sockets to monitor, exiting\n");
         return;
     }
-    
-    sigset_t mask_set;
-    sigemptyset(&mask_set);
 
     struct timespec ts = {.tv_sec = NOMEM_WAIT_SECONDS, .tv_nsec = NOMEM_WAIT_NANOSECONDS};
-
+    
     while(true){
-        /*
-         * If we receive SIGCHLD during handler execution, we might set
-         * sigchld = 0 without cleaning up a newly-terminated child.
-         * Setting the signal mask like this guards against that
-         * possibility. If the handler does clean up the newly-terminated
-         * child before the next time it's called, it'll safely return 0
-         * the next time it's called.
-         */
-        sigaddset(&mask_set, SIGCHLD);
-        sigaddset(&mask_set, SIGPIPE);
-        sigprocmask(SIG_BLOCK, &mask_set, NULL);
-        
-        //If any of these fail, we sleep for a quarter-second and retry until
-        //we can acquire enough memory to run the handler completely
-        if(sigchld){
-            if(sigchld_handler() == -1){
-                nanosleep(&ts, NULL);
-                continue;
-            }
-            sigchld = 0;
+        if(handle_signals() == -1){
+            //retry until we can acquire enough memory to run the handler completely
+            continue;
         }
-        else if(sighup){
-            if(sighup_handler() == -1){
-                nanosleep(&ts, NULL);
-                continue;
-            }
-            sighup = 0;
-        }
-        else if(sigpipe){
-            if(sigpipe_handler() == -1){
-                nanosleep(&ts, NULL);
-                continue;
-            }
-            sigpipe = 0;
-        }
-        else if(sigterm){
-            sigterm_handler();
-        }
-            
-        sigprocmask(SIG_UNBLOCK, &mask_set, NULL);
-        sigemptyset(&mask_set);
 
+        //poll(). The majority of our time is spent here.
         int poll_status = poll(monitor_list, monitor_list_count, -1);
         if(poll_status == -1){
             switch(errno){
@@ -131,10 +192,8 @@ void run(){
                     logmsg(LOG_DEBUG, "nexus: Socket polling interrupted by signal, restarting\n");
                     break;
                 case EFAULT:
-                    logmsg(LOG_ERR, "nexus: Global socket monitor list was outside of the program's address space\n");
-                    _exit(-1);
                 case EINVAL:
-                    logmsg(LOG_ERR, "nexus: Too many open file descriptors\n");
+                    logmsg(LOG_ERR, "nexus: Could not poll, %s\n", strerror(errno));
                     _exit(-1);
                 case ENOMEM:
                     logmsg(LOG_WARNING, "nexus: Could not poll sockets, the system is out of memory\n");
@@ -145,15 +204,22 @@ void run(){
         }
 
         for(size_t i = 0; i < monitor_list_count; i++){
-            if(monitor_list[i].revents & POLLIN){
-                struct plugin* p = htable_lookup(rc_plugin_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
-                struct network* n = htable_lookup(rc_network_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
+            struct plugin* p = htable_lookup(rc_plugin_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
+            struct network* n = htable_lookup(rc_network_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
+
+            //Connection has been completed, check status
+            if(monitor_list[i].revents & POLLOUT){
+                check_connection(n);
+            }
+            //There is input waiting on a socket queue
+            else if(monitor_list[i].revents & POLLIN){
                 //process network input
                 if(n){
-                    irc_msg_recv(n->name);
+                    inet_recv(n->name);
                 }
                 //process plugin input
                 else if(p){
+
                 }
             }
         }
