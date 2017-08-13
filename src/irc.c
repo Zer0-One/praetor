@@ -213,7 +213,7 @@
 #define FORMAT_USER "USER %s %s %s * :%s"
 
 
-char* irc_msg_build(char* fmt, ...){
+char* irc_msg_build(const char* fmt, ...){
     char* msg = calloc(1, MSG_SIZE_MAX + 1);
     if(msg == NULL){
         return NULL;
@@ -242,13 +242,13 @@ char* irc_msg_build(char* fmt, ...){
         return NULL;
     }
 
-    msg[MSG_BODY_MAX] = '\r';
-    msg[MSG_BODY_MAX + 1] = '\n';
+    msg[s] = '\r';
+    msg[s + 1] = '\n';
 
     return msg;
 }
 
-int irc_register_connection(char* network){
+int irc_register_connection(const char* network){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
         logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
@@ -257,24 +257,90 @@ int irc_register_connection(char* network){
 
     //Need to add a "password" field to the config...
     char* pass = irc_msg_build(FORMAT_PASS, "blah");
+    if(pass == NULL){
+        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
+        return -1;
+    }
+    
     char* nick = irc_msg_build(FORMAT_NICK, n->nick);
+    if(nick == NULL){
+        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
+        free(pass);
+        return -1;
+    }
     //Need to add a "user_mode" field to the config...
     char* user = irc_msg_build(FORMAT_USER, n->user, "8", n->real_name);
-
-    if(pass == NULL || nick == NULL || user == NULL){
+    if(user == NULL){
         logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
+        free(pass); free(nick);
         return -1;
     }
 
     if( 
-        inet_send(network, pass, strlen(pass)) == -1 ||
+        //inet_send(network, pass, strlen(pass)) == -1 ||
         inet_send(network, nick, strlen(nick)) == -1 ||
         inet_send(network, user, strlen(user)) == -1
       )
     {
+        free(pass); free(nick); free(user);
         logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
         return -1;
     }
+
+    free(pass); free(nick); free(user);
+    return 0;
+}
+
+int irc_register_connection_all(){
+    struct list* networks = htable_get_keys(rc_network_sock, false);
+
+    if(networks == NULL){
+        logmsg(LOG_WARNING, "irc: Failed to load list of configured networks\n");
+        logmsg(LOG_WARNING, "irc: There are no configured networks or the system is out of memory\n");
+        return -1;
+    }
+
+    for(struct list* this = networks; this != 0; this = this->next){
+        irc_register_connection(this->key);
+    }
+
+    htable_key_list_free(networks, false);
+   
+    return 0;
+}
+
+int irc_msg_recv(const char* network, char* buf, size_t len){
+    struct network* n;
+    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
+        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
+        return -1;
+    }
+
+    char* eom = strstr(n->msgbuf, "\r\n");
+    if(eom == NULL){
+        logmsg(LOG_DEBUG, "irc: Could not read a complete IRC message from '%s'\n", network);
+        return -1;
+    }
+
+    eom += 1;
+    size_t bytes_to_read = eom - n->msgbuf + 1;
+
+    if(len < bytes_to_read){
+        logmsg(LOG_ERR, "irc: Could not read IRC message from network '%s', buffer too small\n", network);
+        _exit(-1);
+    }
+
+    //The number of characters left over in the buffer
+    size_t remainder = strlen(n->msgbuf + bytes_to_read);
+
+    //Copy message to the buffer, and null-terminate it
+    strncpy(buf, n->msgbuf, bytes_to_read);
+    buf[bytes_to_read] = '\0';
+
+    //Shift the remaining text to the front of the msgbuf
+    memmove(n->msgbuf, eom + 1, remainder);
+    memset(n->msgbuf + remainder, '\0', n->msgbuf_size - remainder);
+    n->msgbuf_idx = remainder;
 
     return 0;
 }

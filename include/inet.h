@@ -68,6 +68,20 @@ int inet_connect(const char* network);
 int inet_connect_all();
 
 /**
+ * Verifies that a non-blocking connect() to the given network completed
+ * successfully. On success, upgrades the connection to a TLS connection (if
+ * necessary) and adds the socket to the global monitor list. On failure,
+ * increments \c addr_idx and retries the connection.
+ *
+ * \param network A string indexing a struct networkinfo in the rc_network hash
+ *                table.
+ *
+ * \return On connection success, return 0.
+ * \return If the connection failed, returns -1.
+ */
+int inet_check_connection(const char* network);
+
+/**
  * For the given network, this function removes its socket from the global
  * monitor list, removes its \c rc_network_sock mapping, and cleans up the
  * message buffer.

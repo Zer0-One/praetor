@@ -11,7 +11,6 @@
 */
 
 #include <errno.h>
-#include <limits.h>
 #include <poll.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -132,44 +131,6 @@ int handle_signals(){
     return 0;
 }
 
-/**
- * Verify that a non-blocking connect() completed successfully. On success,
- * upgrade to a TLS connection (if necessary), and add the socket to the
- * monitor list. On failure, move to the next addr and retry the connection.
- */
-void check_connection(struct network* n){
-    int optval = INT_MAX;
-    socklen_t optlen = sizeof(optval);
-    if(getsockopt(n->sock, SOL_SOCKET, SO_ERROR, &optval, &optlen) == -1){
-        //This is never supposed to fail
-        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
-        _exit(-1);
-    }
-
-    if(optval == 0){
-        logmsg(LOG_DEBUG, "nexus: Connection to network '%s' was successful\n", n->name);
-        watch_remove(n->sock);
-
-        if(inet_tls_upgrade(n->name) == -1){
-            close(n->sock);
-            n->addr_idx++;
-        }
-
-        watch_add(n->sock, false);
-    }
-    else if(optval == INT_MAX){
-        //This is never supposed to happen
-        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
-        _exit(-1);
-    }
-    else{
-        logmsg(LOG_WARNING, "nexus: Connection to network '%s' was unsuccessful\n", n->name);
-        watch_remove(n->sock);
-        n->addr_idx++;
-        inet_connect(n->name);
-    }
-}
-
 void run(){
     if(monitor_list_count < 1){
         logmsg(LOG_ERR, "nexus: No sockets to monitor, exiting\n");
@@ -209,13 +170,18 @@ void run(){
 
             //Connection has been completed, check status
             if(monitor_list[i].revents & POLLOUT){
-                check_connection(n);
+                if(inet_check_connection(n->name) == 0){
+                    irc_register_connection(n->name);
+                }
             }
             //There is input waiting on a socket queue
             else if(monitor_list[i].revents & POLLIN){
                 //process network input
                 if(n){
                     inet_recv(n->name);
+                    char msg[MSG_SIZE_MAX];
+                    irc_msg_recv(n->name, msg, MSG_SIZE_MAX);
+                    logmsg(LOG_DEBUG, "%s", msg);
                 }
                 //process plugin input
                 else if(p){

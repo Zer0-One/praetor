@@ -133,7 +133,9 @@
  * \return 0 on success.
  * \return -1 on failure.
  */
-int irc_register_connection(char* network);
+int irc_register_connection(const char* network);
+
+int irc_register_connection_all();
 
 /**
  * Builds an IRC message from the given format string.
@@ -147,6 +149,22 @@ int irc_register_connection(char* network);
  *         should be freed when it is no longer needed.
  * \return On failure, returns NULL.
  */
-char* irc_msg_build(char* fmt, ...);
+char* irc_msg_build(const char* fmt, ...);
+
+/**
+ * Scans the message buffer belonging to the given network for a complete IRC
+ * message. If a message is found, it is copied to \c buf .
+ *
+ * \param network A string indexing a struct networkinfo in the rc_network hash
+ *                table.
+ * \param buf     A buffer in which the next complete IRC message will be
+ *                stored.
+ * \param len     The length of \c buf.
+ *
+ * \return 0 on success.
+ * \return On failure to find a complete message, or if the given buffer is too
+ * small to hold the next message, this function returns -1.
+ */
+int irc_msg_recv(const char* network, char* buf, size_t len);
 
 #endif

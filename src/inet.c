@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netdb.h>
 #include <poll.h>
 #include <stdbool.h>
@@ -211,13 +212,14 @@ int inet_connect(const char* network){
 
     //Create a message buffer for the network, if one doesn't already exist
     if(n->msgbuf == 0){
-        if((n->msgbuf = calloc(MSG_SIZE_MAX, sizeof(char))) == NULL){
+        //+1 to account for a null-terminator; the buffer can then be read like any string
+        if((n->msgbuf = calloc(MSG_SIZE_MAX + 1, sizeof(char))) == NULL){
             logmsg(LOG_WARNING, "inet: Could not allocate message buffer for network '%s', the system is out of memory\n", network);
             close(sock);
             return -1;
         }
         n->msgbuf_idx = 0;
-        n->msgbuf_size = MSG_SIZE_MAX;
+        n->msgbuf_size = MSG_SIZE_MAX + 1;
     }
 
     int rval = 0;
@@ -284,6 +286,46 @@ int inet_connect_all(){
     return 0;
 }
 
+int inet_check_connection(const char* network){
+    struct network* n;
+    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
+        logmsg(LOG_WARNING, "inet: No configuration found for network '%s'\n", network);
+        return -1;
+    }
+
+    int optval = INT_MAX;
+    socklen_t optlen = sizeof(optval);
+    if(getsockopt(n->sock, SOL_SOCKET, SO_ERROR, &optval, &optlen) == -1){
+        //This is never supposed to fail
+        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
+        _exit(-1);
+    }
+
+    if(optval == 0){
+        logmsg(LOG_DEBUG, "nexus: Connection to network '%s' was successful\n", network);
+        watch_remove(n->sock);
+
+        if(inet_tls_upgrade(network) == -1){
+            close(n->sock);
+            n->addr_idx++;
+        }
+
+        watch_add(n->sock, false);
+		return 0;
+    }
+    else if(optval == INT_MAX){
+        //This is never supposed to happen
+        logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
+        _exit(-1);
+    }
+	
+	logmsg(LOG_WARNING, "nexus: Connection to network '%s' was unsuccessful\n", network);
+	watch_remove(n->sock);
+	n->addr_idx++;
+	inet_connect(network);
+	return -1;
+}
+
 int inet_disconnect(const char* network){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
@@ -310,8 +352,13 @@ int inet_recv(const char* network){
         logmsg(LOG_WARNING, "inet: No configuration found for network '%s'\n", network);
         return -1;
     }
-
-    size_t bytes_to_read = n->msgbuf_size - n->msgbuf_idx;
+    
+    //Subtract one to account for the null-terminator
+    size_t bytes_to_read = (n->msgbuf_size - 1) - n->msgbuf_idx;
+    if(bytes_to_read == 0){
+        logmsg(LOG_DEBUG, "inet: Message buffer for network '%s' is full\n", network);
+        return 0;
+    }
 
     ssize_t ret;
     if(n->ssl){
@@ -338,6 +385,7 @@ int inet_recv(const char* network){
             case ECONNRESET:
             case ENOTCONN:
             case ETIMEDOUT:
+                logmsg(LOG_WARNING, "inet: Lost connection to network '%s', %s", network, strerror(errno));
                 goto reconn;
             case ENOBUFS:
             case ENOMEM:
