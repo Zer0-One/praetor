@@ -28,8 +28,10 @@
 #include "irc.h"
 #include "log.h"
 #include "nexus.h"
+#include "queue.h"
 
 #define DEFAULT_PORT "6667"
+#define DEFAULT_PORT_TLS "6697"
 
 int inet_getaddrinfo(const char* network){
     struct network* n;
@@ -38,7 +40,14 @@ int inet_getaddrinfo(const char* network){
         return -1;
     }
 
-    const char* host = n->host, *service = DEFAULT_PORT;
+    const char* host = n->host, *service;
+    if(n->ssl){
+        service = DEFAULT_PORT_TLS;
+    }
+    else{
+        service = DEFAULT_PORT;
+    }
+
     char* tmp = NULL;
     if(strstr(n->host, ":") != NULL){
         //strtok modifies its argument, so make a copy
@@ -105,7 +114,11 @@ int inet_tls_upgrade(const char* network){
         host = strtok(tmp, ":");
     }
 
-    tls_init();
+    if(tls_init() == -1){
+        logmsg(LOG_WARNING, "inet: Could not initialize TLS for connection to '%s' host '%s'\n", network, host);
+        return -1;
+    }
+
     struct tls_config* cfg;
     struct tls* ctx;
     if((ctx = tls_client()) == NULL){
@@ -114,19 +127,26 @@ int inet_tls_upgrade(const char* network){
         free(tmp);
         return -1;
     }
+
     if((cfg = tls_config_new()) == NULL){
-        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', system out of memory\n", network, host);
+        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', %s\n", network, host, tls_config_error(cfg));
         goto fail;
     }
-    if(!tls_configure(ctx, cfg)){
-        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', %s\n", network, host, tls_error(ctx));
+
+    if(tls_configure(ctx, cfg) == -1){
+        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', %s\n", network, host, tls_config_error(cfg));
         tls_config_free(cfg);
         goto fail;
     }
     tls_config_free(cfg);
     
-    if(!tls_connect_socket(ctx, n->sock, host)){
+    if(tls_connect_socket(ctx, n->sock, host) == -1){
         logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host %s, %s\n", network, host, tls_error(ctx));
+        goto fail;
+    }
+
+    if(tls_handshake(ctx) == -1){
+        logmsg(LOG_WARNING, "inet: Could not perform TLS handshake with '%s' host '%s', %s\n", network, host, tls_error(ctx));
         goto fail;
     }
 
@@ -210,16 +230,25 @@ int inet_connect(const char* network){
         return -1;
     }
 
-    //Create a message buffer for the network, if one doesn't already exist
-    if(n->msgbuf == 0){
+    //Create a receive queue for the network, if one doesn't already exist
+    if(n->recv_queue == 0){
         //+1 to account for a null-terminator; the buffer can then be read like any string
-        if((n->msgbuf = calloc(MSG_SIZE_MAX + 1, sizeof(char))) == NULL){
-            logmsg(LOG_WARNING, "inet: Could not allocate message buffer for network '%s', the system is out of memory\n", network);
+        if((n->recv_queue = calloc(MSG_SIZE_MAX + 1, sizeof(char))) == NULL){
+            logmsg(LOG_WARNING, "inet: Could not allocate receive queue for network '%s', the system is out of memory\n", network);
             close(sock);
             return -1;
         }
-        n->msgbuf_idx = 0;
-        n->msgbuf_size = MSG_SIZE_MAX + 1;
+        n->recv_queue_idx = 0;
+        n->recv_queue_size = MSG_SIZE_MAX + 1;
+    }
+
+    //Create a send queue for the network, if one doesn't already exist
+    if(n->send_queue == 0){
+        if((n->send_queue = queue_create()) == NULL){
+            logmsg(LOG_WARNING, "inet: Could not allocate send queue for network '%s', the system is out of memory\n", network);
+            close(sock);
+            return -1;
+        }
     }
 
     int rval = 0;
@@ -337,11 +366,17 @@ int inet_disconnect(const char* network){
     watch_remove(n->sock);
     if(htable_remove(rc_network_sock, &n->sock, sizeof(n->sock)) == -1){
         logmsg(LOG_WARNING, "inet: Could not remove socket mapping for network '%s', no such mapping exists\n", network);
-        return -1;
     }
 
-    memset(n->msgbuf, '\0', n->msgbuf_size);
-    n->msgbuf_idx = 0;
+    //De-allocate receive queue
+    free(n->recv_queue);
+    n->recv_queue = 0;
+    n->recv_queue_size = 0;
+    n->recv_queue_idx = 0;
+
+    //De-allocate send queue
+    queue_destroy(n->send_queue);
+    n->send_queue = 0;
 
     return 0;
 }
@@ -354,7 +389,7 @@ int inet_recv(const char* network){
     }
     
     //Subtract one to account for the null-terminator
-    size_t bytes_to_read = (n->msgbuf_size - 1) - n->msgbuf_idx;
+    size_t bytes_to_read = (n->recv_queue_size - 1) - n->recv_queue_idx;
     if(bytes_to_read == 0){
         logmsg(LOG_DEBUG, "inet: Message buffer for network '%s' is full\n", network);
         return 0;
@@ -362,8 +397,11 @@ int inet_recv(const char* network){
 
     ssize_t ret;
     if(n->ssl){
-        ret = tls_read(n->ctx, n->msgbuf + n->msgbuf_idx, bytes_to_read);
-        if(ret == -1){
+        ret = tls_read(n->ctx, n->recv_queue + n->recv_queue_idx, bytes_to_read);
+        if(ret == TLS_WANT_POLLIN){
+            return -1;
+        }
+        else if(ret == -1){
             logmsg(LOG_WARNING, "inet: Could not read from network '%s' via TLS connection, %s\n", network, tls_error(n->ctx));
             //I do this because idk how to get more specific info from libtls
             //This needs to be corrected eventually
@@ -371,7 +409,7 @@ int inet_recv(const char* network){
         }
     }
     else{
-        ret = recv(n->sock, n->msgbuf + n->msgbuf_idx, bytes_to_read, 0);
+        ret = recv(n->sock, n->recv_queue + n->recv_queue_idx, bytes_to_read, 0);
     }
     
     if(ret == -1){
@@ -400,7 +438,7 @@ int inet_recv(const char* network){
         goto reconn;
     }
 
-    n->msgbuf_idx += ret;
+    n->recv_queue_idx += ret;
     return 0;
 
     reconn:
@@ -409,7 +447,7 @@ int inet_recv(const char* network){
         return -1;
 }
 
-int inet_send(const char* network, const char* buf, size_t len){
+int inet_send_immediate(const char* network, const char* buf, size_t len){
     struct network* n;
     if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
         logmsg(LOG_WARNING, "inet: No configuration found for network '%s'\n", network);
@@ -419,7 +457,10 @@ int inet_send(const char* network, const char* buf, size_t len){
     ssize_t ret;
     if(n->ssl){
         ret = tls_write(n->ctx, buf, len);
-        if(ret == -1){
+        if(ret == TLS_WANT_POLLOUT || ret == TLS_WANT_POLLIN){
+            return -1;
+        }
+        else if(ret == -1){
             logmsg(LOG_WARNING, "inet: Could not send to network '%s' via TLS connection, %s\n", network, tls_error(n->ctx));
             //I do this because idk how to get more specific info from libtls
             //This needs to be corrected eventually
@@ -450,6 +491,7 @@ int inet_send(const char* network, const char* buf, size_t len){
         }
     }
 
+    logmsg(LOG_DEBUG, "inet: Sent to network '%s': %.*s\n", network, (int)len, buf);
     return 0;
 
     reconn:
@@ -457,4 +499,49 @@ int inet_send(const char* network, const char* buf, size_t len){
         inet_disconnect(network);
         inet_connect(network);
         return -1;
+}
+
+int inet_send(const char* network){
+    struct network* n;
+    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
+        logmsg(LOG_WARNING, "inet: No configuration found for network '%s'\n", network);
+        return -1;
+    }
+
+    struct item* itm = NULL;
+    while((itm = queue_peek(n->send_queue)) != NULL){
+        logmsg(LOG_DEBUG, "%s >> %.*s", network, (int)itm->size, itm->value);
+        if(inet_send_immediate(n->name, itm->value, itm->size) == 0){
+            queue_item_free(queue_dequeue(n->send_queue));
+        }
+        else{
+            queue_item_free(itm);
+            return -1;
+        }
+    }
+
+    queue_item_free(itm);
+    return 0;
+}
+
+int inet_send_all(){
+    struct list* fds = htable_get_keys(rc_network_sock, false);
+    if(fds == NULL){
+        logmsg(LOG_WARNING, "inet: Failed to load list of connected networks\n");
+        logmsg(LOG_WARNING, "inet: There are no connected networks, or the system is out of memory\n");
+        return -1;
+    }
+
+    for(struct list* this = fds; this != 0; this = this->next){
+        struct network* n = htable_lookup(rc_network_sock, this->key, sizeof(int));
+        //This should never happen.
+        if(n == NULL){
+            logmsg(LOG_ERR, "inet: Failed to load network configuration\n");
+            _exit(-1);
+        }
+
+        inet_send(n->name);
+    }
+
+    return 0;
 }

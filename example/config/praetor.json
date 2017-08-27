@@ -7,8 +7,8 @@
     "networks": [
         {
             "name": "freenode",
-            "host": "chat.freenode.net:6667",
-            "ssl": false,
+            "host": "chat.freenode.net",
+            "ssl": true,
             "nick": "praetor",
             "alt_nick": "praetor??",
             "user": "praetor",
@@ -54,7 +54,7 @@
         {
             "name": "efnet",
             "host": "irc.efnet.org",
-            "ssl": false,
+            "ssl": true,
             "nick": "shazbot",
             "alt_nick": "shazbot??",
             "user": "shazbot",

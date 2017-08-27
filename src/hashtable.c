@@ -77,13 +77,13 @@ struct htable* htable_create(size_t size){
     }
     struct htable* table = calloc(1, sizeof(struct htable));
     if(table == NULL){
-        logmsg(LOG_ERR, "htable: Could not allocate memory for a new hash table\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate memory for a new hash table\n");
         return NULL;
     }
     table->bucket_array = calloc(size, sizeof(struct htable_data));
     if(table->bucket_array == NULL){
         free(table);
-        logmsg(LOG_ERR, "htable: Could not allocate memory for a new hash table\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate memory for a new hash table\n");
         return NULL;
     }
     table->bucket_count = size;
@@ -151,7 +151,7 @@ int htable_data_write(struct htable_data* entry, const void* key, size_t key_len
     entry->key = calloc(key_len, sizeof(char));
     if(entry->key == NULL){
         entry->key = 0;
-        logmsg(LOG_ERR, "htable: Could not allocate enough memory to store mapping\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate enough memory to store mapping\n");
         return -1;
     }
     memcpy(entry->key, key, key_len);
@@ -182,7 +182,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
     entry->next = calloc(1, sizeof(struct htable_data));
     if(entry->next == NULL){
         entry->next = 0;
-        logmsg(LOG_ERR, "htable: Could not allocate enough memory to store mapping\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate enough memory to store mapping\n");
         return -1;
     }
     if(htable_data_write(entry->next, key, key_len, value) == -1){
@@ -197,7 +197,7 @@ int htable_add(struct htable* table, const void* key, size_t key_len, void* valu
         table->size = 0;
         table->bucket_count *= 2;
         if(htable_rehash(table) == -1){
-            logmsg(LOG_ERR, "htable: Could not allocate enough memory for resize/rehash\n");
+            logmsg(LOG_DEBUG, "htable: Could not allocate enough memory for resize/rehash\n");
             table->bucket_count /= 2;
             table->size = tmp_size;
         }
@@ -273,7 +273,7 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
     struct list* key_list = calloc(1, sizeof(struct list));
     struct list* list_this = key_list;
     if(key_list == NULL){
-        logmsg(LOG_ERR, "htable: Could not allocate memory for a new key list\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate memory for a new key list\n");
         return NULL;
     }
     for(size_t i = 0; i < table->bucket_count; i++){
@@ -304,7 +304,7 @@ struct list* htable_get_keys(const struct htable* table, bool deep){
     return tmp;
 
     fail:
-        logmsg(LOG_ERR, "htable: Could not allocate memory for a new key list\n");
+        logmsg(LOG_DEBUG, "htable: Could not allocate memory for a new key list\n");
         struct list* temp = key_list->next;
         free(key_list);
         htable_key_list_free(temp, deep);

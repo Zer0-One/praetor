@@ -31,10 +31,11 @@ int inet_getaddrinfo(const char* network);
  * Establishes a socket connection using the host:service combination
  * configured for the given network.
  *
- * For new networks, this function populates \c addr with the list of addrinfo
- * structs returned by a DNS lookup; it also allocates space for a message
- * buffer, and updates the \c msgbuf field to point to it, and the \c
- * msgbuf_size field to its size.
+ * For new networks, this function: 
+ *  - Populates \c addr with the list of addrinfo structs returned by a DNS lookup
+ *  - Allocates a send queue, and points \c send_queue to it.
+ *  - Alocates a receive queue, points \c recv_queue to it, and sets \c
+ *    recv_queue_size to the size of the receive queue.
  *
  * On success, this function stores the resultant socket file descriptor in the
  * \c sock field for the given network, and also adds it to the global monitor
@@ -82,14 +83,16 @@ int inet_connect_all();
 int inet_check_connection(const char* network);
 
 /**
- * For the given network, this function removes its socket from the global
- * monitor list, removes its \c rc_network_sock mapping, and cleans up the
- * message buffer.
+ * For the given network, this function:
+ *  - Removes its socket from the global monitor list
+ *  - Removes its \c rc_network_sock mapping
+ *  - De-allocates its send and receive queues.
  *
  * \param network A string indexing a struct networkinfo in the rc_network hash
  *                table.
  *
- * \return 0 on 
+ * \return 0 on success.
+ * \return -1 if no configuration could be found for the given network.
  */
 int inet_disconnect(const char* network);
 
@@ -98,7 +101,7 @@ int inet_disconnect(const char* network);
  * hostname associated with the given network will be used to verify the remote
  * host's certificate against the local certificate store. It is not necessary
  * to check for whether or not the given network is configured for TLS before
- * calling this function; it may be called after all connections.
+ * calling this function; it may be called after any connection.
  *
  * On success, stores the resultant libtls context in the \c ctx field of the
  * given network.
@@ -115,8 +118,8 @@ int inet_disconnect(const char* network);
 int inet_tls_upgrade(const char* network);
 
 /**
- * Reads from the socket belonging to the given network until its message
- * buffer is full, or until reading would block.
+ * Reads from the socket belonging to the given network until its receive queue
+ * is full, or until reading would block.
  *
  * If reading fails due to a connection issue, this function initiates a
  * restart of the connection via inet_disconnect() and inet_connect().
@@ -132,6 +135,8 @@ int inet_recv(const char* network);
 /**
  * Sends a message on the socket belonging to the given network.
  *
+ * If the message could not be sent for any reason, it is discarded.
+ *
  * If the message could not be sent due to a connection issue, this function
  * initiates a restart of the connection via inet_disconnect() and
  * inet_connect().
@@ -144,5 +149,29 @@ int inet_recv(const char* network);
  * \return -1 on failure to send via the given socket.
  * \return 0 on success.
  */
-int inet_send(const char* network, const char* buf, size_t len);
+int inet_send_immediate(const char* network, const char* buf, size_t len);
+
+/**
+ * Attempts to send all messages currently in the given network's send queue.
+ *
+ * This function calls inet_send_immediate() in order to send each message.
+ *
+ * \param network A string indexing a struct networkinfo in the rc_network hash
+ *                table.
+ *
+ * \return 0 on success, or if the system was out of memory.
+ * \return -1 on failure to send one or more messages.
+ */
+int inet_send(const char* network);
+
+/**
+ * Calls inet_send() for every network that is actively connected.
+ *
+ * This function only fails if the system is out of memory.
+ *
+ * \return 0 on success.
+ * \return -1 on failure.
+ */
+int inet_send_all();
+
 #endif

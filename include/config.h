@@ -17,7 +17,9 @@
 #include <sys/socket.h>
 #include <stdbool.h>
 #include <tls.h>
+
 #include "hashtable.h"
+#include "queue.h"
 
 /**
  * A pointer to the global struct containing praetor's daemon-specific
@@ -207,19 +209,23 @@ struct network{
      */
     struct tls* ctx;
     /**
-     * A buffer for the next message(s) from this network. At any given time,
-     * this buffer may contain no full lines, or multiple lines.
+     * A buffer for the messages received from this network. At any given time,
+     * this buffer may contain no full messages, or multiple messages.
      */
-    char* msgbuf;
+    char* recv_queue;
     /**
      * The size of the message buffer.
      */
-    size_t msgbuf_size;
+    size_t recv_queue_size;
     /**
      * An index one greater than the index of the last character in the message
      * buffer.
      */
-    size_t msgbuf_idx;
+    size_t recv_queue_idx;
+    /**
+     * A buffer for the messages to be sent to this network.
+     */
+    struct queue* send_queue;
 };
 
 /**

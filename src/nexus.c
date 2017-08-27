@@ -28,7 +28,7 @@
 #include "signals.h"
 
 #define NOMEM_WAIT_SECONDS 0
-#define NOMEM_WAIT_NANOSECONDS 250000000
+#define NOMEM_WAIT_NANOSECONDS 500000000
 
 //The number of pollfd structs currently being monitored for input.
 size_t monitor_list_count = 0;
@@ -81,56 +81,6 @@ void watch_remove(const int fd){
     }
 }
 
-int handle_signals(){
-    sigset_t mask_set;
-    sigemptyset(&mask_set);
-
-    struct timespec ts = {.tv_sec = NOMEM_WAIT_SECONDS, .tv_nsec = NOMEM_WAIT_NANOSECONDS};
-    
-    /*
-     * If we receive SIGCHLD during handler execution, we might set
-     * sigchld = 0 without cleaning up a newly-terminated child.
-     * Setting the signal mask like this guards against that
-     * possibility. If the handler does clean up the newly-terminated
-     * child before the next time it's called, it'll safely return 0
-     * the next time it's called.
-     */
-    sigaddset(&mask_set, SIGCHLD);
-    sigaddset(&mask_set, SIGPIPE);
-    sigprocmask(SIG_BLOCK, &mask_set, NULL);
-    
-    //If any of these fail, we sleep for a quarter-second 
-    if(sigchld){
-        if(sigchld_handler() == -1){
-            nanosleep(&ts, NULL);
-            return -1;
-        }
-        sigchld = 0;
-    }
-    else if(sighup){
-        if(sighup_handler() == -1){
-            nanosleep(&ts, NULL);
-            return -1;
-        }
-        sighup = 0;
-    }
-    else if(sigpipe){
-        if(sigpipe_handler() == -1){
-            nanosleep(&ts, NULL);
-            return -1;
-        }
-        sigpipe = 0;
-    }
-    else if(sigterm){
-        sigterm_handler();
-    }
-        
-    sigprocmask(SIG_UNBLOCK, &mask_set, NULL);
-    sigemptyset(&mask_set);
-
-    return 0;
-}
-
 void run(){
     if(monitor_list_count < 1){
         logmsg(LOG_ERR, "nexus: No sockets to monitor, exiting\n");
@@ -141,17 +91,20 @@ void run(){
     
     while(true){
         if(handle_signals() == -1){
-            //retry until we can acquire enough memory to run the handler completely
+            //If handling of any signal fails, we were out of memory
+            //Sleep for a bit and then retry
+            nanosleep(&ts, NULL);
             continue;
         }
 
-        //poll(). The majority of our time is spent here.
-        int poll_status = poll(monitor_list, monitor_list_count, -1);
+        //The majority of our time is spent here.
+        int poll_status = poll(monitor_list, monitor_list_count, 500);
+        //Handle polling errors
         if(poll_status == -1){
             switch(errno){
                 case EINTR:
                     logmsg(LOG_DEBUG, "nexus: Socket polling interrupted by signal, restarting\n");
-                    break;
+                    continue;
                 case EFAULT:
                 case EINVAL:
                     logmsg(LOG_ERR, "nexus: Could not poll, %s\n", strerror(errno));
@@ -161,7 +114,13 @@ void run(){
                     logmsg(LOG_DEBUG, "nexus: Attempting another poll in %d seconds and %d nanoseconds\n", NOMEM_WAIT_SECONDS, NOMEM_WAIT_NANOSECONDS);
                     //Sleep for a quarter of a second and try again
                     nanosleep(&ts, NULL);
+                    continue;
             }
+        }
+        //Try to flush all send queues
+        else if(poll_status == 0){
+            inet_send_all();
+            continue;
         }
 
         for(size_t i = 0; i < monitor_list_count; i++){
@@ -171,7 +130,9 @@ void run(){
             //Connection has been completed, check status
             if(monitor_list[i].revents & POLLOUT){
                 if(inet_check_connection(n->name) == 0){
-                    irc_register_connection(n->name);
+                    while(irc_register_connection(n->name) != 0){
+                        nanosleep(&ts, NULL);
+                    }
                 }
             }
             //There is input waiting on a socket queue
@@ -180,8 +141,11 @@ void run(){
                 if(n){
                     inet_recv(n->name);
                     char msg[MSG_SIZE_MAX];
-                    irc_msg_recv(n->name, msg, MSG_SIZE_MAX);
-                    logmsg(LOG_DEBUG, "%s", msg);
+                    while(irc_msg_recv(n->name, msg, MSG_SIZE_MAX) != -1){
+                        while(irc_handle_ping(n->name, msg) == -2){
+                            nanosleep(&ts, NULL);
+                        }
+                    }
                 }
                 //process plugin input
                 else if(p){

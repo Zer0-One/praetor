@@ -141,3 +141,47 @@ void sigterm_handler(){
     //irc_disconnect_all();
     _exit(-1);
 }
+
+int handle_signals(){
+    sigset_t mask_set;
+    sigemptyset(&mask_set);
+
+    /*
+     * If we receive SIGCHLD during handler execution, we might set
+     * sigchld = 0 without cleaning up a newly-terminated child.
+     * Setting the signal mask like this guards against that
+     * possibility. If the handler does clean up the newly-terminated
+     * child before the next time it's called, it'll safely return 0
+     * the next time it's called.
+     */
+    sigaddset(&mask_set, SIGCHLD);
+    sigaddset(&mask_set, SIGPIPE);
+    sigprocmask(SIG_BLOCK, &mask_set, NULL);
+
+    if(sigchld){
+        if(sigchld_handler() == -1){
+            return -1;
+        }
+        sigchld = 0;
+    }
+    else if(sighup){
+        if(sighup_handler() == -1){
+            return -1;
+        }
+        sighup = 0;
+    }
+    else if(sigpipe){
+        if(sigpipe_handler() == -1){
+            return -1;
+        }
+        sigpipe = 0;
+    }
+    else if(sigterm){
+        sigterm_handler();
+    }
+
+    sigprocmask(SIG_UNBLOCK, &mask_set, NULL);
+    sigemptyset(&mask_set);
+
+    return 0;
+}

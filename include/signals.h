@@ -32,9 +32,18 @@ extern volatile sig_atomic_t sigterm;
  */
 int signal_init();
 
+/**
+ * Processes any delivered signals. Signal delivery is blocked during the
+ * execution of this function.
+ *
+ * \return 0 on success.
+ * \return -1 if any signal handler fails.
+ */
+int handle_signals();
+
 int sigchld_handler();
 int sighup_handler();
 int sigpipe_handler();
-int sigterm_handler();
+void sigterm_handler();
 
 #endif
