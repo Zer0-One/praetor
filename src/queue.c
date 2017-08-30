@@ -44,7 +44,7 @@ void queue_destroy(struct queue* q){
     struct item* this = q->head;
     while(this != NULL){
         struct item* tmp = this->next;
-        queue_item_free(this);
+        free(this);
         this = tmp;
     }
 
@@ -52,19 +52,12 @@ void queue_destroy(struct queue* q){
 }
 
 int queue_enqueue(struct queue* q, const void* value, size_t size){
-    struct item* itm = malloc(sizeof(struct item));
+    struct item* itm = malloc(sizeof(struct item) + size);
     if(itm == NULL){
         logmsg(LOG_DEBUG, "queue: Could not allocate enough memory to enqueue new item\n");
         return -1;
     }
     
-    itm->value = malloc(size);
-    if(itm->value == NULL){
-        logmsg(LOG_DEBUG, "queue: Could not allocate enough memory to enqueue a new item\n");
-        free(itm);
-        return -1;
-    }
-
     memcpy(itm->value, value, size);
     itm->size = size;
     itm->next = NULL;
@@ -100,19 +93,12 @@ struct item* queue_peek(struct queue* q){
         return NULL;
     }
 
-    struct item* itm = malloc(sizeof(struct item));
+    struct item* itm = malloc(sizeof(struct item) + q->head->size);
     if(itm == NULL){
         logmsg(LOG_DEBUG, "queue: Could not allocate enough memory for a queue peek\n");
         return NULL;
     }
 
-    itm->value = malloc(q->head->size);
-    if(itm->value == NULL){
-        logmsg(LOG_DEBUG, "queue: Could not allocate enough memory for a queue peek\n");
-        free(itm);
-        return NULL;
-    }
-    
     memcpy(itm->value, q->head->value, q->head->size);
     itm->size = q->head->size;
     itm->next = NULL;

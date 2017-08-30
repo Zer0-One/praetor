@@ -26,9 +26,10 @@
 #include "log.h"
 #include "nexus.h"
 
+#define FORMAT_JOIN "JOIN %s %s"
+#define FORMAT_NICK "NICK %s"
 #define FORMAT_PASS "PASS %s"
 #define FORMAT_PING "PONG %s"
-#define FORMAT_NICK "NICK %s"
 #define FORMAT_USER "USER %s %s %s * :%s"
 
 char* irc_msg_build(const char* fmt, ...){
@@ -158,6 +159,30 @@ int irc_register_connection(const char* network){
         logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
         free(pass); free(nick); free(user);
         return -1;
+}
+
+int irc_join(const char* network, const char* channels, const char* keys){
+    struct network* n;
+    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
+        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
+        return -1;
+    }
+
+    char* join = irc_msg_build(FORMAT_JOIN, channels, keys);
+    if(join == NULL){
+        logmsg(LOG_WARNING, "irc: Could not join channel(s) '%s' with keys '%s' on network '%s'\n", channels, keys, network);
+        return -1;
+    }
+
+    if(queue_enqueue(n->send_queue, join, strlen(join)) == -1){
+        logmsg(LOG_WARNING, "irc: Could not join channel(s) '%s' with keys '%s' on network '%s'\n", channels, keys, network);
+        free(join);
+        return -1;
+    }
+
+    free(join);
+
+    return 0;
 }
 
 int irc_handle_ping(const char* network, const char* buf){

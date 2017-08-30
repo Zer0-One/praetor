@@ -131,15 +131,21 @@ void run(){
             if(monitor_list[i].revents & POLLOUT){
                 if(inet_check_connection(n->name) == 0){
                     while(irc_register_connection(n->name) != 0){
+                        logmsg(LOG_DEBUG, "fuck, we're stuck\n");
                         nanosleep(&ts, NULL);
                     }
+                }
+                else{
+                    inet_connect(n->name);
                 }
             }
             //There is input waiting on a socket queue
             else if(monitor_list[i].revents & POLLIN){
                 //process network input
                 if(n){
-                    inet_recv(n->name);
+                    if(inet_recv(n->name) == -1){
+                        continue;
+                    }
                     char msg[MSG_SIZE_MAX];
                     while(irc_msg_recv(n->name, msg, MSG_SIZE_MAX) != -1){
                         while(irc_handle_ping(n->name, msg) == -2){

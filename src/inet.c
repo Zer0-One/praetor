@@ -133,6 +133,10 @@ int inet_tls_upgrade(const char* network){
         goto fail;
     }
 
+    //uint32_t protocols;
+    //tls_config_parse_protocols(&protocols, "secure");
+    //tls_config_set_protocols(cfg, protocols);
+
     if(tls_configure(ctx, cfg) == -1){
         logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', %s\n", network, host, tls_config_error(cfg));
         tls_config_free(cfg);
@@ -170,8 +174,13 @@ int inet_connect(const char* network){
     }
 
     struct addrinfo* addr = NULL;
+    //If we've exhausted all addresses, fail
+    if(n->addr_idx == INT_MAX){
+        logmsg(LOG_WARNING, "inet: All usable addresses available for network '%s' have been exhausted, aborting connection\n", network);
+        return -2;
+    }
     //If we haven't done DNS lookups yet, do them
-    if(n->addr == 0){
+    else if(n->addr == 0){
         if(inet_getaddrinfo(network) == -1){
             return -2;
         }
@@ -182,11 +191,12 @@ int inet_connect(const char* network){
         addr = n->addr;
         //Update addr to the one indexed by n->addr_idx
         for(size_t i = 0; i < n->addr_idx; i++){
-            addr = n->addr->ai_next;
+            addr = addr->ai_next;
             if(addr == NULL){
                 logmsg(LOG_WARNING, "inet: All usable addresses available for network '%s' have been exhausted, aborting connection\n", network);
                 freeaddrinfo(n->addr);
-                n->addr = NULL;
+                n->addr = 0;
+                n->addr_idx = INT_MAX;
                 return -2;
             }
         }
@@ -335,8 +345,7 @@ int inet_check_connection(const char* network){
         watch_remove(n->sock);
 
         if(inet_tls_upgrade(network) == -1){
-            close(n->sock);
-            n->addr_idx++;
+            goto fail;
         }
 
         watch_add(n->sock, false);
@@ -347,12 +356,14 @@ int inet_check_connection(const char* network){
         logmsg(LOG_ERR, "nexus: Unable to check socket connection for errors\n");
         _exit(-1);
     }
-	
-	logmsg(LOG_WARNING, "nexus: Connection to network '%s' was unsuccessful\n", network);
-	watch_remove(n->sock);
-	n->addr_idx++;
-	inet_connect(network);
-	return -1;
+
+    fail:
+        logmsg(LOG_WARNING, "nexus: Connection to network '%s' was unsuccessful\n", network);
+        htable_remove(rc_network_sock, &n->sock, sizeof(n->sock));
+        watch_remove(n->sock);
+        n->addr_idx++;
+        close(n->sock);
+        return -1;
 }
 
 int inet_disconnect(const char* network){
@@ -405,6 +416,7 @@ int inet_recv(const char* network){
             logmsg(LOG_WARNING, "inet: Could not read from network '%s' via TLS connection, %s\n", network, tls_error(n->ctx));
             //I do this because idk how to get more specific info from libtls
             //This needs to be corrected eventually
+            n->addr_idx++;
             goto reconn;
         }
     }
@@ -435,6 +447,7 @@ int inet_recv(const char* network){
         }
     }
     else if(ret == 0){
+        logmsg(LOG_WARNING, "inet: Network '%s' closed the connection\n", network);
         goto reconn;
     }
 
@@ -442,6 +455,7 @@ int inet_recv(const char* network){
     return 0;
 
     reconn:
+        logmsg(LOG_DEBUG, "inet: Attempting to reconnect to network '%s'\n", network);
         inet_disconnect(network);
         inet_connect(network);
         return -1;
@@ -464,6 +478,7 @@ int inet_send_immediate(const char* network, const char* buf, size_t len){
             logmsg(LOG_WARNING, "inet: Could not send to network '%s' via TLS connection, %s\n", network, tls_error(n->ctx));
             //I do this because idk how to get more specific info from libtls
             //This needs to be corrected eventually
+            n->addr_idx++;
             goto reconn;            
         }
         return 0;
@@ -510,17 +525,17 @@ int inet_send(const char* network){
 
     struct item* itm = NULL;
     while((itm = queue_peek(n->send_queue)) != NULL){
-        logmsg(LOG_DEBUG, "%s >> %.*s", network, (int)itm->size, itm->value);
-        if(inet_send_immediate(n->name, itm->value, itm->size) == 0){
-            queue_item_free(queue_dequeue(n->send_queue));
+        if(inet_send_immediate(n->name, (char*)itm->value, itm->size) == 0){
+            logmsg(LOG_DEBUG, "%s >> %.*s", network, (int)itm->size, itm->value);
+            free(queue_dequeue(n->send_queue));
         }
         else{
-            queue_item_free(itm);
+            free(itm);
             return -1;
         }
     }
 
-    queue_item_free(itm);
+    free(itm);
     return 0;
 }
 

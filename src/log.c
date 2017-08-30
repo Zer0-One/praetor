@@ -67,4 +67,6 @@ void logprintf(int loglevel, char* msg, ...){
     vprintf(msg, args);
 
     va_end(args);
+
+    fflush(NULL);
 }

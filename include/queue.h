@@ -13,21 +13,26 @@
 #ifndef PRAETOR_QUEUE
 #define PRAETOR_QUEUE
 
+#include <stdint.h>
+
 struct queue;
 
 /**
  * A struct representing an item in the queue.
  */
 struct item{
-    void* value;
-    /**
-     * The size, in bytes, of the value pointed to by \c value.
-     */
-    size_t size;
     /**
      * This field is not used by a caller, and will always be NULL.
      */
     struct item* next;
+    /**
+     * The size, in bytes, of \c value.
+     */
+    size_t size;
+    /**
+     * The variably-sized value.
+     */
+    uint8_t value[];
 };
 
 /**
@@ -60,7 +65,7 @@ int queue_enqueue(struct queue* q, const void* value, size_t size);
 
 /**
  * Removes an item from the front of the queue. The caller is responsible for
- * freeing the returned item by calling queue_item_free().
+ * freeing the returned item.
  *
  * This function will fail if the system is out of memory, or if there are no
  * items in the queue.
@@ -72,7 +77,7 @@ struct item* queue_dequeue(struct queue* q);
 
 /**
  * Returns a copy of the item at the front of the queue. The caller is
- * responsible for freeing the returned item by calling queue_item_free().
+ * responsible for freeing the returned item.
  *
  * This function will fail if the system is out of memory, or if there are no
  * items in the queue.
@@ -81,11 +86,6 @@ struct item* queue_dequeue(struct queue* q);
  * \return On failure, returns NULL.
  */
 struct item* queue_peek(struct queue* q);
-
-/**
- * Destroys the given item, freeing all associated memory.
- */
-#define queue_item_free(itm) free(itm->value); free(itm)
 
 /**
  * Returns the number of items present in the given queue.

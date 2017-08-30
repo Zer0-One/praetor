@@ -102,6 +102,21 @@ int irc_msg_recv(const char* network, char* buf, size_t len);
 int irc_register_connection(const char* network);
 
 /**
+ * Joins the given set of channels using the given keys.
+ *
+ * This function only fails if the system is out of memory.
+ *
+ * \param channels As described in RFC 2812, a comma-delimited list of
+ *                 channels.
+ * \param keys     As described in RFC 2812, a comma-delimited list of keys. If
+ *                 no keys are necessary, this parameter may be set to NULL.
+ *
+ * \return 0 on success.
+ * \return -1 on failure.
+ */
+int irc_join(const char* network, const char* channels, const char* keys);
+
+/**
  * Scans a message to determine if it is a PING message, and if so, sends the
  * appropriate PONG response back to the originating server. This function
  * expects \c buf to be null-terminated.

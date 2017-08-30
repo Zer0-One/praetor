@@ -16,7 +16,7 @@
             "quit_msg": "I AM THE SHAZBOT",
             "channels": [
                 {
-                    "name": "##test1",
+                    "name": "##earthpig",
                     "password": "testpassword"
                 },
                 {
@@ -54,7 +54,7 @@
         {
             "name": "efnet",
             "host": "irc.efnet.org",
-            "ssl": true,
+            "ssl": false,
             "nick": "shazbot",
             "alt_nick": "shazbot??",
             "user": "shazbot",

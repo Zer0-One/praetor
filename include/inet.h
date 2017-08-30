@@ -44,8 +44,8 @@ int inet_getaddrinfo(const char* network);
  * On connection failure (and not any other failure reason), increments the
  * network's \c addr_idx counter to point to the next address to be tried. If
  * this function fails to connect using the last valid address in the list, it
- * fail immediately on every subsequent invocation until the \c addr field for
- * the given network is reset to 0.
+ * sets \c addr_idx to INT_MAX, and will fail immediately on every subsequent
+ * invocation until the \c addr_idx is reset to 0.
  *
  * \param network A string indexing a struct networkinfo in the rc_network hash
  *                table.
@@ -54,7 +54,8 @@ int inet_getaddrinfo(const char* network);
  * \return If the connection could not be established immediately, returns 1.
  * \return -1 on failure to connect using the address currently pointed to by
  *         the network's \c addr_idx field.
- * \return -2 on failure to connect with any address.
+ * \return -2 on failure to connect to all addresses associated with the
+ *         network.
  */
 int inet_connect(const char* network);
 
@@ -72,7 +73,8 @@ int inet_connect_all();
  * Verifies that a non-blocking connect() to the given network completed
  * successfully. On success, upgrades the connection to a TLS connection (if
  * necessary) and adds the socket to the global monitor list. On failure,
- * increments \c addr_idx and retries the connection.
+ * removes the mapping for the socket from \c rc_network_sock, and increments
+ * \c addr_idx.
  *
  * \param network A string indexing a struct networkinfo in the rc_network hash
  *                table.
