@@ -23,7 +23,7 @@
 
 #include "config.h"
 #include "daemonize.h"
-#include "hashtable.h"
+#include "htable.h"
 #include "inet.h"
 #include "log.h"
 #include "nexus.h"
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]){
                 print_usage();
                 _exit(0);
             case 'v':
-                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015,2016 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
+                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015-2017 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
                 printf("This build of praetor has been compiled with support for:\n");
                 printf("Jansson Version: %s\n", JANSSON_VERSION);
                 printf("LibreSSL Version: %s\n\n", LIBRESSL_VERSION_TEXT);
@@ -73,23 +73,29 @@ int main(int argc, char* argv[]){
                 _exit(-1);
         }
     }
-    
+
     if(config_path == NULL){
-        logmsg(LOG_ERR, "main: You must specify a configuration file path\n");
+        logmsg(LOG_ERR, "You must specify a configuration file path\n");
         print_usage();
         _exit(-1);
     }
-    logmsg(LOG_DEBUG, "main: Config file path = %s\n", config_path);
+    logmsg(LOG_DEBUG, "Config file path = %s\n", config_path);
 
     //allocate space for various configuration
     if((rc_praetor = calloc(1, sizeof(struct praetor))) == NULL){
-        logmsg(LOG_ERR, "main: Cannot allocate memory for daemon configuration\n");
+        logmsg(LOG_ERR, "Could not allocate global data structures, the system is out of memory\n");
         _exit(-1);
     }
+
     rc_network = htable_create(5);
     rc_network_sock = htable_create(5);
     rc_plugin = htable_create(5);
     rc_plugin_sock = htable_create(5);
+
+    if(rc_network == NULL || rc_network_sock == NULL || rc_plugin == NULL || rc_plugin_sock == NULL){
+        logmsg(LOG_ERR, "Could not allocate global data structures, the system is out of memory\n");
+        _exit(-1);
+    }
 
     //load configuration
     if(config_load(config_path) == -1){
@@ -120,5 +126,7 @@ int main(int argc, char* argv[]){
     }
 
     //main event loop
-    run();
+    while(true){
+        run();
+    }
 }

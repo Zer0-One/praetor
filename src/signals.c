@@ -17,7 +17,7 @@
 #include <sys/wait.h>
 
 #include "config.h"
-#include "hashtable.h"
+#include "htable.h"
 #include "irc.h"
 #include "log.h"
 #include "nexus.h"
@@ -75,7 +75,8 @@ int signal_init(){
 }
 
 int sigchld_handler(){
-    struct list* plugins = htable_get_keys(rc_plugin, false);
+    size_t size = 0;
+    struct htable_key** plugins = htable_get_keys(rc_plugin, &size);
     if(plugins == NULL){
         logmsg(LOG_WARNING, "signals: Failed to load list of configured plugins\n");
         logmsg(LOG_WARNING, "signals: There are no configured plugins, or the system is out of memory\n");
@@ -86,8 +87,8 @@ int sigchld_handler(){
     pid_t pid;
     struct plugin* p;
     while((pid = waitpid(-1, &wstatus, WNOHANG)) > 0){
-        for(struct list* this = plugins; this != 0; this = this->next){
-            p = htable_lookup(rc_plugin, this->key, this->size);
+        for(size_t i = 0; i < size; i++){
+            p = htable_lookup(rc_plugin, plugins[i]->key, plugins[i]->key_size);
             if(p->pid == pid){
                 goto success;
             }
@@ -108,7 +109,7 @@ int sigchld_handler(){
         }
 
         watch_remove(p->sock);
-        htable_remove(rc_plugin_sock, &p->sock, sizeof(&p->sock));
+        htable_remove(rc_plugin_sock, (uint8_t*)&p->sock, sizeof(&p->sock));
         close(p->sock);
         p->pid = 0;
         p->sock = 0;
@@ -125,7 +126,7 @@ int sigchld_handler(){
         }
     }
 
-    htable_key_list_free(plugins, false);
+    htable_key_list_free(plugins, size);
     return 0;
 }
 

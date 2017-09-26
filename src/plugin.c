@@ -21,13 +21,13 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "hashtable.h"
+#include "htable.h"
 #include "log.h"
 #include "nexus.h"
 
 int plugin_load(const char* plugin){
     struct plugin* p;
-    if((p = htable_lookup(rc_plugin, plugin, strlen(plugin)+1)) == NULL){
+    if((p = htable_lookup(rc_plugin, (uint8_t*)plugin, strlen(plugin)+1)) == NULL){
         logmsg(LOG_WARNING, "plugin: No configuration found for plugin '%s'\n", plugin);
         return -1;
     }
@@ -68,13 +68,13 @@ int plugin_load(const char* plugin){
             p->pid = child_pid;
             p->sock = fds[0];
             
-            if(htable_add(rc_plugin_sock, &fds[0], sizeof(fds[0]), p) < 0){
+            if(htable_add(rc_plugin_sock, (uint8_t*)&fds[0], sizeof(fds[0]), p) < 0){
                 logmsg(LOG_WARNING, "plugin: Failed to map IPC socket to configuration for plugin '%s'\n", plugin);
                 goto fail;
             }
             if(watch_add(fds[0], false) == -1){
                 logmsg(LOG_WARNING, "plugin: Failed to add plugin socket to global monitor list for plugin '%s'\n", plugin);
-                if(htable_remove(rc_plugin_sock, &fds[0], sizeof(fds[0])) != 0){
+                if(htable_remove(rc_plugin_sock, (uint8_t*)&fds[0], sizeof(fds[0])) != 0){
                     //If the index we just added doesn't exist, something's fucky
                     logmsg(LOG_ERR, "plugin: Software failure. Press left mouse button to continue. Guru Meditation #c4fe.b33f.b4b3\n");
                     _exit(-1);
@@ -104,7 +104,8 @@ int plugin_load(const char* plugin){
 }
 
 int plugin_load_all(){
-    struct list* plugins = htable_get_keys(rc_plugin, false);
+    size_t size = 0;
+    struct htable_key** plugins = htable_get_keys(rc_plugin, &size);
     if(plugins == NULL){
         logmsg(LOG_WARNING, "plugin: Failed to load list of configured plugins\n");
         logmsg(LOG_WARNING, "plugin: There are no configured plugins, or the system is out of memory\n");
@@ -112,27 +113,28 @@ int plugin_load_all(){
     }
 
     int ret = 0;
-    for(struct list* this = plugins; this != 0; this = this->next){
-        struct plugin* p = htable_lookup(rc_plugin, this->key, this->size);
+    for(size_t i = 0; i < size; i++){
+        struct plugin* p = htable_lookup(rc_plugin, plugins[i]->key, plugins[i]->key_size);
         int fd = plugin_load(p->name);
         if(fd < 0){
             ret = -1;
         }
     }
-    htable_key_list_free(plugins, false);
+
+    htable_key_list_free(plugins, size);
 
     return ret;
 }
 
 int plugin_unload(const char* plugin){
-    struct plugin* p = htable_lookup(rc_plugin, plugin, strlen(plugin)+1);
+    struct plugin* p = htable_lookup(rc_plugin, (uint8_t*)plugin, strlen(plugin)+1);
     if(p == NULL){
         logmsg(LOG_WARNING, "plugin: Could not unload plugin '%s', no such plugin loaded\n", plugin);
         return -1;
     }
 
     watch_remove(p->sock);
-    if(htable_remove(rc_plugin_sock, &p->sock, sizeof(p->sock)) != 0){
+    if(htable_remove(rc_plugin_sock, (uint8_t*)&p->sock, sizeof(p->sock)) != 0){
         //We had a plugin loaded, but that plugin had no socket connection
         //This should never happen
         logmsg(LOG_ERR, "plugin: Could not unmap socket for plugin '%s', no mapping exists\n", plugin);
@@ -147,7 +149,8 @@ int plugin_unload(const char* plugin){
 }
 
 int plugin_unload_all(){
-    struct list* plugins = htable_get_keys(rc_plugin, false);
+    size_t size = 0;
+    struct htable_key** plugins = htable_get_keys(rc_plugin, &size);
     if(plugins == NULL){
         logmsg(LOG_WARNING, "plugin: Failed to load list of configured plugins\n");
         logmsg(LOG_WARNING, "pluin: There are no configured plugins, or the system is out of memory\n");
@@ -155,14 +158,14 @@ int plugin_unload_all(){
     }
 
     int ret = 0;
-    for(struct list* this = plugins; this != 0; this = this->next){
-        struct plugin* p = htable_lookup(rc_plugin, this->key, this->size);
+    for(size_t i = 0; i < size; i++){
+        struct plugin* p = htable_lookup(rc_plugin, plugins[i]->key, plugins[i]->key_size);
         int stat = plugin_unload(p->name);
         if(stat < 0){
             ret = -1;
         }
     }
-    htable_key_list_free(plugins, false);
+    htable_key_list_free(plugins, size);
 
     return ret;
 }
@@ -185,7 +188,7 @@ int plugin_reload_all(){
 
 json_t* plugin_msg_recv(const char* name){
     struct plugin* p;
-    if((p = htable_lookup(rc_plugin, name, strlen(name)+1)) == NULL){
+    if((p = htable_lookup(rc_plugin, (uint8_t*)name, strlen(name)+1)) == NULL){
         logmsg(LOG_WARNING, "plugin: No configuration found for plugin '%s'\n", name);
         return NULL;
     }

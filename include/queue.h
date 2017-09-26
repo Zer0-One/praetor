@@ -38,7 +38,7 @@ struct item{
 /**
  * Creates a queue.
  *
- * This function will only fail if the system is out of memory.
+ * This function will fail only if the system is out of memory.
  *
  * \return On success, returns a pointer to a dynamically allocated queue.
  * \return On failure, returns NULL.
@@ -56,7 +56,9 @@ void queue_destroy(struct queue* q);
  * Adds an item to the back of the queue.
  *
  * \c size bytes of \c value are copied into an item which will be added to the
- * queue. This function will only fail if the system is out of memory.
+ * queue.
+ *
+ * This function will fail only if the system is out of memory.
  *
  * \return 0 on success.
  * \return -1 on failure.

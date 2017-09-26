@@ -1,5 +1,5 @@
 {
-    "daemon": {
+    "praetor": {
         "user": "praetor",
         "group": "praetor",
         "workdir": "/var/lib/praetor"
@@ -17,7 +17,7 @@
             "channels": [
                 {
                     "name": "##earthpig",
-                    "password": "testpassword"
+                    "key": "testpassword"
                 },
                 {
                     "name": "#test2"
@@ -27,7 +27,7 @@
                 },
                 {   
                     "name": "#test4",
-                    "password": "secretsquirrel"
+                    "key": "secretsquirrel"
                 }
             ],
             "admins": ["johndoe", "zero-one", "janedoe"],
@@ -62,7 +62,7 @@
             "quit_msg": "this is a quit message",
             "channels": [
                 {
-                    "name": "#test1"
+                    "name": "##test1"
                 }
             ],
             "admins": ["johndoe","zero-one","janedoe"],

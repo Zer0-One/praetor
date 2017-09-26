@@ -20,60 +20,12 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "hashtable.h"
-#include "inet.h"
-#include "irc.h"
+#include "htable.h"
+#include "ircmsg.h"
 #include "log.h"
 #include "nexus.h"
 
-#define FORMAT_JOIN "JOIN %s %s"
-#define FORMAT_NICK "NICK %s"
-#define FORMAT_PASS "PASS %s"
-#define FORMAT_PING "PONG %s"
-#define FORMAT_USER "USER %s %s %s * :%s"
-
-char* irc_msg_build(const char* fmt, ...){
-    char* msg = calloc(1, MSG_SIZE_MAX + 1);
-    if(msg == NULL){
-        return NULL;
-    }
-
-    va_list ap;
-    va_start(ap, fmt);
-    
-    int s = vsnprintf(msg, MSG_BODY_MAX, fmt, ap);
-    
-    va_end(ap);
-
-    if(s < 0){
-        logmsg(LOG_DEBUG, "irc: Could not build message '%s'\n", fmt);
-        logmsg(LOG_WARNING, "irc: Could not build message, %s\n", strerror(errno));
-        if(errno == EINVAL || errno == EOVERFLOW){
-            _exit(-1);
-        }
-        return NULL;
-    }
-    
-    if(s >= MSG_SIZE_MAX){
-        logmsg(LOG_DEBUG, "irc: Could not build message '%s'\n", fmt);
-        logmsg(LOG_WARNING, "irc: Could not build message, message parameter too long\n");
-        free(msg);
-        return NULL;
-    }
-
-    msg[s] = '\r';
-    msg[s + 1] = '\n';
-
-    return msg;
-}
-
-int irc_msg_recv(const char* network, char* buf, size_t len){
-    struct network* n;
-    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
-        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
-        return -1;
-    }
-
+int irc_msg_recv(struct network* n, char* buf, size_t len){
     char* eom = strstr(n->recv_queue, "\r\n");
     if(eom == NULL){
         return -1;
@@ -83,7 +35,7 @@ int irc_msg_recv(const char* network, char* buf, size_t len){
     size_t bytes_to_read = eom - n->recv_queue + 1;
 
     if(len < bytes_to_read){
-        logmsg(LOG_ERR, "irc: Could not read IRC message from network '%s', buffer too small\n", network);
+        logmsg(LOG_ERR, "irc: Could not read IRC message from network '%s', buffer too small\n", n->name);
         _exit(-1);
     }
 
@@ -103,102 +55,73 @@ int irc_msg_recv(const char* network, char* buf, size_t len){
     return 0;
 }
 
-int irc_register_connection(const char* network){
-    struct network* n;
-    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
-        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
-        return -1;
-    }
-
-    //Need to add a "password" field to the config...
-    char* pass = irc_msg_build(FORMAT_PASS, "blah");
-    if(pass == NULL){
-        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
-        return -1;
+int irc_register_connection(const struct network* n){
+    if(n->pass != 0){
+        if(irc_pass(n, n->pass) == -1){
+            logmsg(LOG_WARNING, "irc: Could not set connection password on network '%s'\n", n->name);
+            goto fail;
+        }
     }
     
-    char* nick = irc_msg_build(FORMAT_NICK, n->nick);
-    if(nick == NULL){
-        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
-        free(pass);
-        return -1;
-    }
-    
-    //Need to add a "user_mode" field to the config...
-    char* user = irc_msg_build(FORMAT_USER, n->user, "8", n->real_name);
-    if(user == NULL){
-        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
-        free(pass); free(nick);
-        return -1;
-    }
-
-    //if(queue_enqueue(n->send_queue, pass, strlen(nick)) == -1){
-    //    goto fail;
-    //}
-    if(queue_enqueue(n->send_queue, nick, strlen(nick)) == -1){
-        //queue_dequeue(n->send_queue);
+    if(irc_nick(n, n->nick) == -1){
+        logmsg(LOG_WARNING, "irc: Could not set nickname on network '%s'\n", n->name);
+        if(n->pass != 0){
+            free(queue_dequeue(n->send_queue));
+        }
         goto fail;
     }
-    if(queue_enqueue(n->send_queue, user, strlen(user)) == -1){
-        //queue_dequeue(n->send_queue);
-        queue_dequeue(n->send_queue);
+    //logmsg(LOG_DEBUG, "we crafted the nick msg\n");
+    
+    if(irc_user(n, n->user, n->real_name) == -1){
+        logmsg(LOG_WARNING, "irc: Could not set username on network '%s'\n", n->name);
+        if(n->pass != 0){
+            free(queue_dequeue(n->send_queue));
+        }
+        free(queue_dequeue(n->send_queue));
         goto fail;
     }
 
-    //if(inet_send(network, nick, strlen(nick)) == -1 || inet_send(network, user, strlen(user)) == -1){
-    //    free(pass); free(nick); free(user);
-    //    logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
-    //    return -1;
-    //}
-    
-    //logmsg(LOG_DEBUG, "irc: Connection registered with network '%s'\n", network);
-    free(pass); free(nick); free(user);
+    logmsg(LOG_DEBUG, "irc: Connection registered with network '%s'\n", n->name);
     return 0;
 
     fail:
-        logmsg(LOG_WARNING, "irc: Could not register connection with network '%s'\n", network);
-        free(pass); free(nick); free(user);
+        logmsg(LOG_WARNING, "irc: Failed to register connection with network '%s'\n", n->name);
         return -1;
 }
 
-int irc_join(const char* network, const char* channels, const char* keys){
-    struct network* n;
-    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
-        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
+int irc_join_all(const struct network* n){
+    size_t size = 0;
+    struct htable_key** channels = htable_get_keys(n->channels, &size);
+    if(channels == NULL){
         return -1;
     }
 
-    char* join = irc_msg_build(FORMAT_JOIN, channels, keys);
-    if(join == NULL){
-        logmsg(LOG_WARNING, "irc: Could not join channel(s) '%s' with keys '%s' on network '%s'\n", channels, keys, network);
-        return -1;
+    for(size_t i = 0; i < size; i++){
+        struct channel* c = htable_lookup(n->channels, channels[i]->key, strlen((char*)channels[i]->key)+1);
+        if(irc_join(n, c->name, c->key) == -1){
+            //If we don't have enough memory to queue all of the join messages, then don't send any at all
+            for(size_t j = 0; j <= i; j++){
+                queue_dequeue(n->send_queue);
+            }
+            htable_key_list_free(channels, size);
+            logmsg(LOG_WARNING, "irc: Could not join channel '%s' on network '%s'", c->name, n->name);
+            return -1;
+        }
     }
 
-    if(queue_enqueue(n->send_queue, join, strlen(join)) == -1){
-        logmsg(LOG_WARNING, "irc: Could not join channel(s) '%s' with keys '%s' on network '%s'\n", channels, keys, network);
-        free(join);
-        return -1;
-    }
-
-    free(join);
+    htable_key_list_free(channels, size);
 
     return 0;
 }
 
-int irc_handle_ping(const char* network, const char* buf){
-    struct network* n;
-    if((n = htable_lookup(rc_network, network, strlen(network)+1)) == NULL){
-        logmsg(LOG_WARNING, "irc: No configuration found for network '%s'\n", network);
-        return -1;
-    }
-
+int irc_handle_ping(const struct network* n, const char* buf){
     if(strstr(buf, "PING") != buf){
         return -1;
     }
 
     char* tmp;
     const char* ptr;
-    
+
     //If there's a message prefix, skip it
     if(buf[0] != ':'){
         ptr = buf;
@@ -215,9 +138,10 @@ int irc_handle_ping(const char* network, const char* buf){
     strncpy(tmp, ptr, strlen(ptr));
     //Do you like this
     tmp[1] = 'O';
-    
+
     if(queue_enqueue(n->send_queue, tmp, strlen(buf))){
-        logmsg(LOG_WARNING, "irc: Could not reply to PING message from network '%s'\n", network);
+        logmsg(LOG_WARNING, "irc: Could not reply to PING message from network '%s'\n", n->name);
+        free(tmp);
         return -2;
     }
 

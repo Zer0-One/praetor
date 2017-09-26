@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "hashtable.h"
+#include "htable.h"
 #include "inet.h"
 #include "irc.h"
 #include "log.h"
@@ -29,6 +29,7 @@
 
 #define NOMEM_WAIT_SECONDS 0
 #define NOMEM_WAIT_NANOSECONDS 500000000
+#define POLL_TIMEOUT 1000
 
 //The number of pollfd structs currently being monitored for input.
 size_t monitor_list_count = 0;
@@ -89,75 +90,86 @@ void run(){
 
     struct timespec ts = {.tv_sec = NOMEM_WAIT_SECONDS, .tv_nsec = NOMEM_WAIT_NANOSECONDS};
     
-    while(true){
-        if(handle_signals() == -1){
-            //If handling of any signal fails, we were out of memory
-            //Sleep for a bit and then retry
-            nanosleep(&ts, NULL);
+    //If handling of any signal fails, we were out of memory
+    if(handle_signals() == -1){
+        //Sleep for a bit and then retry
+        nanosleep(&ts, NULL);
+        return;
+    }
+
+    int poll_status = poll(monitor_list, monitor_list_count, POLL_TIMEOUT);
+    if(poll_status == -1){
+        switch(errno){
+            case EINTR:
+                logmsg(LOG_DEBUG, "nexus: Socket polling interrupted by signal, restarting\n");
+                return;
+            case EFAULT:
+            case EINVAL:
+                logmsg(LOG_ERR, "nexus: Could not poll, %s\n", strerror(errno));
+                _exit(-1);
+            case ENOMEM:
+                logmsg(LOG_WARNING, "nexus: Could not poll sockets, the system is out of memory\n");
+                logmsg(LOG_DEBUG, "nexus: Attempting another poll in %d seconds and %d nanoseconds\n", NOMEM_WAIT_SECONDS, NOMEM_WAIT_NANOSECONDS);
+                //Sleep for a quarter of a second and try again
+                nanosleep(&ts, NULL);
+                return;
+        }
+    }
+    //Try to flush all send queues
+    else if(poll_status == 0){
+        inet_send_all();
+        return;
+    }
+
+    for(size_t i = 0; i < monitor_list_count; i++){
+        if(monitor_list[i].fd == -1){
             continue;
         }
 
-        //The majority of our time is spent here.
-        int poll_status = poll(monitor_list, monitor_list_count, 500);
-        //Handle polling errors
-        if(poll_status == -1){
-            switch(errno){
-                case EINTR:
-                    logmsg(LOG_DEBUG, "nexus: Socket polling interrupted by signal, restarting\n");
-                    continue;
-                case EFAULT:
-                case EINVAL:
-                    logmsg(LOG_ERR, "nexus: Could not poll, %s\n", strerror(errno));
-                    _exit(-1);
-                case ENOMEM:
-                    logmsg(LOG_WARNING, "nexus: Could not poll sockets, the system is out of memory\n");
-                    logmsg(LOG_DEBUG, "nexus: Attempting another poll in %d seconds and %d nanoseconds\n", NOMEM_WAIT_SECONDS, NOMEM_WAIT_NANOSECONDS);
-                    //Sleep for a quarter of a second and try again
-                    nanosleep(&ts, NULL);
-                    continue;
-            }
-        }
-        //Try to flush all send queues
-        else if(poll_status == 0){
-            inet_send_all();
-            continue;
+        struct network* n;
+        struct plugin* p;
+
+        n = htable_lookup(rc_network_sock, (uint8_t*)&monitor_list[i].fd, sizeof(monitor_list[i].fd));
+        if(n == NULL){
+           p = htable_lookup(rc_plugin_sock, (uint8_t*)&monitor_list[i].fd, sizeof(monitor_list[i].fd));
         }
 
-        for(size_t i = 0; i < monitor_list_count; i++){
-            struct plugin* p = htable_lookup(rc_plugin_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
-            struct network* n = htable_lookup(rc_network_sock, &monitor_list[i].fd, sizeof(monitor_list[i].fd));
-
+        if(n != NULL){
             //Connection has been completed, check status
             if(monitor_list[i].revents & POLLOUT){
-                if(inet_check_connection(n->name) == 0){
-                    while(irc_register_connection(n->name) != 0){
-                        logmsg(LOG_DEBUG, "fuck, we're stuck\n");
+                if(inet_check_connection(n) == 0){
+                    while(irc_register_connection(n) != 0){
                         nanosleep(&ts, NULL);
                     }
+                    irc_join_all(n);
                 }
                 else{
-                    inet_connect(n->name);
+                    inet_connect(n);
                 }
             }
             //There is input waiting on a socket queue
             else if(monitor_list[i].revents & POLLIN){
-                //process network input
-                if(n){
-                    if(inet_recv(n->name) == -1){
-                        continue;
-                    }
-                    char msg[MSG_SIZE_MAX];
-                    while(irc_msg_recv(n->name, msg, MSG_SIZE_MAX) != -1){
-                        while(irc_handle_ping(n->name, msg) == -2){
-                            nanosleep(&ts, NULL);
-                        }
+                if(inet_recv(n) == -1){
+                    continue;
+                }
+                char msg[MSG_SIZE_MAX];
+                while(irc_msg_recv(n, msg, MSG_SIZE_MAX) != -1){
+                    while(irc_handle_ping(n, msg) == -2){
+                        nanosleep(&ts, NULL);
                     }
                 }
-                //process plugin input
-                else if(p){
 
-                }
+                //Dispatch messages to plugins according to ACLs
             }
+        }
+        else if(p != NULL){
+            logmsg(LOG_DEBUG, "we haven't implemented this\n");
+            //Dispatch messages to networks according to ACLs and rate-limits
+        }
+        else{
+            //This should never happen.
+            logmsg(LOG_ERR, "nexus: Polled socket belonged to neither a network nor a plugin\n");
+            _exit(-1);
         }
     }
 }

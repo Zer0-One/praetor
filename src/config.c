@@ -21,11 +21,11 @@
 
 #include "config.h"
 #include "log.h"
-#include "hashtable.h"
+#include "htable.h"
 
 #define SCHEMA_CHANNELS "{s:s, s?s}"
 #define SCHEMA_DAEMON "{s?s, s?s, s?s}"
-#define SCHEMA_NETWORKS "{s:s, s:s, s?b, s:s, s:s, s:s, s:s, s:s, s?o, s?o, s?o}"
+#define SCHEMA_NETWORKS "{s?o, s:s, s?o, s:s, s:s, s:s, s?s, s?o, s?s, s:s, s?b, s:s}"
 #define SCHEMA_PLUGINS "{s:s, s:s}"
 #define SCHEMA_ROOT "{s?o, s?o, s?o}"
 
@@ -56,20 +56,38 @@ int config_load(char* path){
     }
 
     initconfig(rc_praetor);
-    json_t* daemon_section = NULL, *networks_section = NULL, *plugins_section;
+    json_t* praetor_section = NULL, *networks_section = NULL, *plugins_section;
     
     //Unpack and validate root object
-    if(json_unpack_ex(root, &error, JSON_STRICT, SCHEMA_ROOT, "daemon", &daemon_section, "networks", &networks_section, "plugins", &plugins_section)){
+    int ret = json_unpack_ex(
+        root,
+        &error,
+        JSON_STRICT,
+        SCHEMA_ROOT,
+        "praetor", &praetor_section,
+        "networks", &networks_section,
+        "plugins", &plugins_section
+    );
+    if(ret == -1){
         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
         return -1;
     }
 
-    //Unpack and validate daemon configuration section
-    if(daemon_section == NULL){
-        logmsg(LOG_WARNING, "config: No daemon section, using default settings\n");
+    //Unpack and validate praetor configuration section
+    if(praetor_section == NULL){
+        logmsg(LOG_WARNING, "config: No praetor section, using default settings\n");
     }
     else{
-        if(json_unpack_ex(daemon_section, &error, JSON_STRICT, SCHEMA_DAEMON, "user", &rc_praetor->user, "group", &rc_praetor->group, "workdir", &rc_praetor->workdir) == -1){
+        int ret = json_unpack_ex(
+            praetor_section,
+            &error,
+            JSON_STRICT,
+            SCHEMA_DAEMON,
+            "user", &rc_praetor->user,
+            "group", &rc_praetor->group,
+            "workdir", &rc_praetor->workdir
+        );
+        if(ret == -1){
             logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
             return -1;
         }
@@ -96,7 +114,7 @@ int config_load(char* path){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 return -1;
             }
-            htable_add(rc_plugin, plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
+            htable_add(rc_plugin, (uint8_t*)plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
             logmsg(LOG_DEBUG, "config: Added configuration for plugin %s\n", plugin_this->name);
         }
     }
@@ -122,12 +140,30 @@ int config_load(char* path){
             //instantiate hash tables for this network
             network_this->channels = htable_create(10);
             network_this->plugins = htable_create(10);
-            if(json_unpack_ex(value, &error, JSON_STRICT, SCHEMA_NETWORKS, "name", &network_this->name, "host", &network_this->host, "ssl", &network_this->ssl, "nick", &network_this->nick, "alt_nick", &network_this->alt_nick, "user", &network_this->user, "real_name", &network_this->real_name, "quit_msg", &network_this->quit_msg, "channels", &channels, "admins", &admins, "plugins", &plugins) == -1){
+            int ret = json_unpack_ex(
+                value,
+                &error,
+                JSON_STRICT,
+                SCHEMA_NETWORKS,
+                "admins", &admins,
+                "alt_nick", &network_this->alt_nick,
+                "channels", &channels,
+                "host", &network_this->host,
+                "name", &network_this->name,
+                "nick", &network_this->nick,
+                "pass", &network_this->pass,
+                "plugins", &plugins,
+                "quit_msg", &network_this->quit_msg,
+                "real_name", &network_this->real_name,
+                "ssl", &network_this->ssl,
+                "user", &network_this->user
+            );
+            if(ret == -1){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 return -1;
             }
             //add this networkinfo to the global hash table, indexed by its name
-            htable_add(rc_network, network_this->name, strlen(network_this->name)+1, network_this);
+            htable_add(rc_network, (uint8_t*)network_this->name, strlen(network_this->name)+1, network_this);
             logmsg(LOG_DEBUG, "config: Added configuration for network %s\n", network_this->name);
         
 
@@ -170,11 +206,11 @@ int config_load(char* path){
                         logmsg(LOG_ERR, "config: Cannot allocate memory for network configuration\n");
                         return -1;
                     }
-                    if(json_unpack_ex(channel_value, &error, JSON_STRICT, SCHEMA_CHANNELS, "name", &channel_this->name, "password", &channel_this->password) == -1){
+                    if(json_unpack_ex(channel_value, &error, JSON_STRICT, SCHEMA_CHANNELS, "name", &channel_this->name, "key", &channel_this->key) == -1){
                         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                         return -1;
                     }
-                    htable_add(network_this->channels, channel_this->name, strlen(channel_this->name)+1, channel_this);
+                    htable_add(network_this->channels, (uint8_t*)channel_this->name, strlen(channel_this->name)+1, channel_this);
                     logmsg(LOG_DEBUG, "config: Added channel %s to network %s\n", channel_this->name, network_this->name);
                 }
             }

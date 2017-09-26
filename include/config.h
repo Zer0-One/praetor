@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <tls.h>
 
-#include "hashtable.h"
+#include "htable.h"
 #include "queue.h"
 
 /**
@@ -42,8 +42,8 @@ extern struct htable* rc_network, * rc_network_sock;
 extern struct htable* rc_plugin, * rc_plugin_sock;
 
 /**
- * Contains the configuration options required for praetor to function as a
- * daemon.
+ * General configuration options, not specific to any particular network or
+ * plugin.
  */
 struct praetor{
     /**
@@ -110,15 +110,15 @@ struct plugin{
      */
     size_t rate_limit;
     /**
-     * A linked list of channels that this plugin will be allowed to receive
-     * input from.
+     * A hash table containing channels that this plugin will be allowed to
+     * receive input from.
      */
-    struct channelinfo* input;
+    struct htable* input;
     /**
-     * A linked list of channels that this plugin will be allowed to send
-     * output to.
+     * A hash table containing channels that this plugin will be allowed to
+     * send output to.
      */
-    struct channelinfo* output;
+    struct htable* output;
 };
 
 /**
@@ -126,7 +126,7 @@ struct plugin{
  */
 struct channel{
     const char* name;
-    const char* password;
+    const char* key;
 };
 
 /**
@@ -174,12 +174,15 @@ struct network{
      */
     const char* real_name;
     /**
+     * The password to use when connecting to the network.
+     */
+    const char* pass;
+    /**
      * The message to be sent with a QUIT command.
      */
     const char* quit_msg;
     /**
-     * A hash table containing the names of the channels on this network that
-     * praetor will join upon registering a connection.
+     * A hash table containing channel configuration settings.
      */
     struct htable* channels;
     /**
@@ -192,7 +195,7 @@ struct network{
      */
     struct htable* plugins;
     /**
-     * A socket file descriptor for the connection to this IRC server.
+     * A socket file descriptor for the connection to this IRC network.
      */
     int sock;
     /**
@@ -234,6 +237,7 @@ struct network{
  *     - rc_praetor (struct praetor)
  *     - rc_network (struct htable)
  *     - rc_plugin (struct htable)
+ * 
  * Memory for these structures must be allocated before calling this function.
  * All fields of the rc_praetor struct are given default values, and do not
  * need to be specified by the user unless the defaults need to be overridden.

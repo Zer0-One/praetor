@@ -17,7 +17,7 @@ praetor-debug: bin/praetor_debug
 
 bin/praetor : src/*.c include/*.h
 		mkdir -p bin
-		$(cc) -O3 -fPIE -pie -fstack-protector-strong -std=c99 -pedantic-errors -Wall -Wextra -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o $@
+		$(cc) -O3 -fPIE -pie -fstack-protector-strong -Wl,-z,now -Wl,-z,relro -std=c99 -pedantic-errors -Wall -Wextra -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o $@
 		chmod +x bin/praetor
 
 bin/praetor_debug : src/*.c include/*.h
