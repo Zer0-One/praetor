@@ -50,16 +50,16 @@ int plugin_load(const char* plugin){
                 logmsg(LOG_WARNING, "plugin: Failed to duplicate socket file descriptor to stdin/stdout for plugin '%s'\n", plugin);
                 _exit(-1);
             }
-            
+
             close(fds[0]);
             close(fds[1]);
             closelog();
-            
+
             char* argv[] = {basename(p->path), NULL};
             char* envp[] = {"PRAETOR_PLUGIN=1", NULL};
             execve(p->path, argv, envp);
 
-            //the following error can never be printed in foreground mode, we've already closed stdin/stdout
+            //The following error can never be printed in foreground mode, we've already closed stdin/stdout
             logmsg(LOG_WARNING, "plugin: Failed to exec plugin '%s', %s\n", plugin, strerror(errno));
             _exit(-1);
         default:
@@ -67,7 +67,7 @@ int plugin_load(const char* plugin){
 
             p->pid = child_pid;
             p->sock = fds[0];
-            
+
             if(htable_add(rc_plugin_sock, (uint8_t*)&fds[0], sizeof(fds[0]), p) < 0){
                 logmsg(LOG_WARNING, "plugin: Failed to map IPC socket to configuration for plugin '%s'\n", plugin);
                 goto fail;
@@ -82,8 +82,7 @@ int plugin_load(const char* plugin){
                 goto fail;
             }
 
-            //If the socket isn't non-blocking, we can't read from it;
-            //otherwise, a single shitty plugin could hang the bot
+            //If the socket isn't non-blocking, we can't read from it; a single shitty plugin could hang the bot
             int flags = fcntl(fds[0], F_GETFL);
             if(flags == -1){
                 logmsg(LOG_WARNING, "plugin: Failed to get flags for plugin socket for plugin '%s', %s\n", plugin, strerror(errno));
@@ -186,21 +185,15 @@ int plugin_reload_all(){
     return -1;
 }
 
-json_t* plugin_msg_recv(const char* name){
-    struct plugin* p;
-    if((p = htable_lookup(rc_plugin, (uint8_t*)name, strlen(name)+1)) == NULL){
-        logmsg(LOG_WARNING, "plugin: No configuration found for plugin '%s'\n", name);
-        return NULL;
-    }
-   
+json_t* plugin_recv(const struct plugin* p){
     json_error_t error;
     json_t* msg = json_loadfd(p->sock, JSON_DISABLE_EOF_CHECK, &error);
     //This covers malformed messages, and since the sockets are non-blocking, I
     //*think* it covers hanging plugins as well (reads returning EAGAIN/EWOULDBLOCK).
     if(msg == NULL){
-        logmsg(LOG_WARNING, "plugin: %s at Line: %d, Column: %d in message sent by plugin '%s'\n", error.text, error.line, error.column, name);
-        logmsg(LOG_WARNING, "plugin: Restarting plugin '%s' for bad behavior\n", name);
-        plugin_reload(name);
+        logmsg(LOG_WARNING, "plugin: %s at Line: %d, Column: %d in message sent by plugin '%s'\n", error.text, error.line, error.column, p->name);
+        logmsg(LOG_WARNING, "plugin: Restarting plugin '%s' for bad behavior\n", p->name);
+        plugin_reload(p->name);
         return NULL;
     }
 

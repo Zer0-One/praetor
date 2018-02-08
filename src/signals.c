@@ -112,7 +112,7 @@ int sigchld_handler(){
         htable_remove(rc_plugin_sock, (uint8_t*)&p->sock, sizeof(&p->sock));
         close(p->sock);
         p->pid = 0;
-        p->sock = 0;
+        p->sock = -1;
     }
 
     if(pid == -1){

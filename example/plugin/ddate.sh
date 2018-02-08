@@ -7,9 +7,10 @@ while sleep 1m; do
         DATE=`date +%D`
         cat <<EOF
 {
-    "type" : "PRIVMSG",
+    "type" : "privmsg",
+    "network" : "*",
     "target" : "*",
-    "message" : "HEAR YE, HEAR YE: `ddate`"
+    "msg" : "HEAR YE, HEAR YE: `ddate`"
 }
 EOF
     fi

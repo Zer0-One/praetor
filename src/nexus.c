@@ -23,6 +23,7 @@
 #include "htable.h"
 #include "inet.h"
 #include "irc.h"
+#include "ircmsg.h"
 #include "log.h"
 #include "plugin.h"
 #include "signals.h"
@@ -152,19 +153,30 @@ void run(){
                 if(inet_recv(n) == -1){
                     continue;
                 }
-                char msg[MSG_SIZE_MAX];
-                while(irc_msg_recv(n, msg, MSG_SIZE_MAX) != -1){
-                    while(irc_handle_ping(n, msg) == -2){
-                        nanosleep(&ts, NULL);
+                char msg[IRCMSG_SIZE_MAX];
+                while(irc_recv(n, msg, IRCMSG_SIZE_MAX) != -1){
+                    struct ircmsg* parsed_msg = ircmsg_parse(n->name, msg, strlen(msg));
+                    if(parsed_msg->type == PING){
+                        while(irc_handle_ping(n, parsed_msg) == -1){
+                            nanosleep(&ts, NULL);
+                        }
                     }
+                   
+                    //erase the shit above ^
+
+                    //1. convert the message to json
+                    //2. if message type == ping, send a pong
+                    //3. send the json message to plugins for processing
+                    //json_t json_msg;
+                    //irc_json_from_msg(&json_msg, );
                 }
 
                 //Dispatch messages to plugins according to ACLs
             }
         }
         else if(p != NULL){
-            logmsg(LOG_DEBUG, "we haven't implemented this\n");
             //Dispatch messages to networks according to ACLs and rate-limits
+            json_t* msg = plugin_recv(p);
         }
         else{
             //This should never happen.

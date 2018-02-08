@@ -17,6 +17,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -25,7 +26,7 @@
 
 #include "config.h"
 #include "htable.h"
-#include "irc.h"
+#include "ircmsg.h"
 #include "log.h"
 #include "nexus.h"
 #include "queue.h"
@@ -111,7 +112,7 @@ int inet_tls_upgrade(struct network* n){
     struct tls_config* cfg;
     struct tls* ctx;
     if((ctx = tls_client()) == NULL){
-        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', system out of memory\n", n->name, host);
+        logmsg(LOG_WARNING, "inet: Could not establish TLS connection to '%s' host '%s', the system is out of memory\n", n->name, host);
         free(tmp);
         return -1;
     }
@@ -234,12 +235,12 @@ int inet_connect(struct network* n){
     //Create a receive queue for the network, if one doesn't already exist
     if(n->recv_queue == 0){
         //+1 to account for a null-terminator; the buffer can then be read like any string
-        if((n->recv_queue = calloc(MSG_SIZE_MAX + 1, sizeof(char))) == NULL){
+        if((n->recv_queue = calloc(IRCMSG_SIZE_MAX + 1, sizeof(char))) == NULL){
             logmsg(LOG_WARNING, "inet: Could not allocate receive queue for network '%s', the system is out of memory\n", n->name);
             goto fail;
         }
         n->recv_queue_idx = 0;
-        n->recv_queue_size = MSG_SIZE_MAX + 1;
+        n->recv_queue_size = IRCMSG_SIZE_MAX + 1;
     }
 
     //Create a send queue for the network, if one doesn't already exist
@@ -369,10 +370,20 @@ int inet_check_connection(struct network* n){
 }
 
 int inet_disconnect(struct network* n){
+    if(n->ssl){
+        tls_close(n->ctx);
+    }
     close(n->sock);
+
+    //Free TLS context
+    tls_free(n->ctx);
+
+    //Remove socket from monitor list
     watch_remove(n->sock);
+
+    //Remove rc_network_sock mapping
     if(htable_remove(rc_network_sock, (uint8_t*)&n->sock, sizeof(n->sock)) == -1){
-        logmsg(LOG_WARNING, "inet: Could not remove socket mapping for network '%s', no such mapping exists\n", n->name);
+        logmsg(LOG_DEBUG, "inet: Could not remove socket mapping for network '%s', no such mapping exists\n", n->name);
     }
 
     //De-allocate receive queue
@@ -425,7 +436,7 @@ int inet_recv(struct network* n){
             case ECONNRESET:
             case ENOTCONN:
             case ETIMEDOUT:
-                logmsg(LOG_WARNING, "inet: Lost connection to network '%s', %s", n->name, strerror(errno));
+                logmsg(LOG_WARNING, "inet: Lost connection to network '%s', %s\n", n->name, strerror(errno));
                 goto reconn;
             case ENOBUFS:
             case ENOMEM:
@@ -483,7 +494,7 @@ int inet_send_immediate(struct network* n, const char* buf, size_t len){
             //We might have an address that can be reached from another interface
             case ENETDOWN:
             case ENETUNREACH:
-                logmsg(LOG_WARNING, "inet: Lost connection to network '%s', %s", n->name, strerror(errno));
+                logmsg(LOG_WARNING, "inet: Lost connection to network '%s', %s\n", n->name, strerror(errno));
                 goto reconn;
             default:
                 logmsg(LOG_ERR, "inet: Unable to send to network '%s', %s\n", n->name, strerror(errno));

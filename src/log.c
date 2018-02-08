@@ -26,13 +26,6 @@ void logprintf(int loglevel, char* msg, ...){
     va_list args;
     va_start(args, msg);
 
-    //struct timeval tv;
-    //char date_buffer[DATE_BUFFER_LENGTH];
-
-    //gettimeofday(&tv, NULL);
-    //struct tm* bd_time = localtime(&tv.tv_sec);
-    //strftime(date_buffer, DATE_BUFFER_LENGTH, "[%F %T]", bd_time);
-   
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
 

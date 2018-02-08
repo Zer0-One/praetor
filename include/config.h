@@ -64,72 +64,6 @@ struct praetor{
 };
 
 /**
- * This struct represents the configuration of a loaded plugin
- */
-struct plugin{
-    /**
-     * A handle for the plugin, to be used as an index in hash tables.
-     */
-    char* name;
-    /**
-     * The process ID of the child process spawned for this plugin.
-     */
-    pid_t pid;
-    /**
-     * Praetor's end of the socket pair for this plugin.
-     */
-    int sock;
-    /**
-     * The name of the plugin author, to be printed on calls to
-     * plugin_get_author().
-     */
-    char* author;
-    /**
-     * The version of the plugin
-     */
-    char* version;
-    /**
-     * A description of the plugin, to be printed on calls to
-     * plugin_get_description().
-     */
-    char* description;
-    /**
-     * The filesystem path at which the plugin binary is located.
-     */
-    char* path;
-    /**
-     * If set to true, this plugin will be allowed to send and receive private
-     * messages.
-     */
-    bool private_messages;
-    /**
-     * The number of milliseconds that this plugin will be required to wait
-     * before sending another message. If the plugin sends messages at a rate
-     * that exceeds this limit, the messages will be queued and sent one-by-one
-     * as the rate_limit timer cycles.
-     */
-    size_t rate_limit;
-    /**
-     * A hash table containing channels that this plugin will be allowed to
-     * receive input from.
-     */
-    struct htable* input;
-    /**
-     * A hash table containing channels that this plugin will be allowed to
-     * send output to.
-     */
-    struct htable* output;
-};
-
-/**
- * This struct describes an IRC channel.
- */
-struct channel{
-    const char* name;
-    const char* key;
-};
-
-/**
  * A struct that contains configuration options for connections to an IRC
  * network.
  */
@@ -229,6 +163,72 @@ struct network{
      * A buffer for the messages to be sent to this network.
      */
     struct queue* send_queue;
+};
+
+/**
+ * This struct represents the configuration of a loaded plugin
+ */
+struct plugin{
+    /**
+     * A handle for the plugin, to be used as an index in hash tables.
+     */
+    char* name;
+    /**
+     * The process ID of the child process spawned for this plugin.
+     */
+    pid_t pid;
+    /**
+     * Praetor's end of the socket pair for this plugin.
+     */
+    int sock;
+    /**
+     * The name of the plugin author, to be printed on calls to
+     * plugin_get_author().
+     */
+    char* author;
+    /**
+     * The version of the plugin
+     */
+    char* version;
+    /**
+     * A description of the plugin, to be printed on calls to
+     * plugin_get_description().
+     */
+    char* description;
+    /**
+     * The filesystem path at which the plugin binary is located.
+     */
+    char* path;
+    /**
+     * If set to true, this plugin will be allowed to send and receive private
+     * messages.
+     */
+    bool private_messages;
+    /**
+     * The number of milliseconds that this plugin will be required to wait
+     * before sending another message. If the plugin sends messages at a rate
+     * that exceeds this limit, the messages will be queued and sent one-by-one
+     * as the rate_limit timer cycles.
+     */
+    size_t rate_limit;
+    /**
+     * A hash table containing channels that this plugin will be allowed to
+     * receive input from.
+     */
+    struct htable* input;
+    /**
+     * A hash table containing channels that this plugin will be allowed to
+     * send output to.
+     */
+    struct htable* output;
+};
+
+/**
+ * This struct describes an IRC channel.
+ */
+struct channel{
+    const char* name;
+    const char* key;
 };
 
 /**

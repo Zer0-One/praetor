@@ -41,7 +41,7 @@ int inet_getaddrinfo(struct network* n);
  *  7. Adds the socket to the global monitor list.
  *  8. Adds a mapping for the socket to rc_network_sock.
  *
- * Regarding step #6, if the connection could be established immediately, then
+ * Regarding step #7, if the connection could be established immediately, then
  * the socket will be monitored for readability. If establishing the connection
  * would have blocked, the socket will be monitored for writeability, and
  * inet_check_connection() should be called when the socket is writeable.
@@ -95,10 +95,12 @@ int inet_check_connection(struct network* n);
 
 /**
  * For the given network, this function:
- *  1. Closes its socket.
- *  2. Removes its socket from the global monitor list.
- *  3. Removes its \c rc_network_sock mapping.
- *  4. De-allocates its send and receive queues.
+ *  1. Closes its TLS connection (if applicable).
+ *  2. Closes its socket.
+ *  3. Frees its TLS context.
+ *  4. Removes its socket from the global monitor list.
+ *  5. Removes its \c rc_network_sock mapping.
+ *  6. De-allocates its send and receive queues.
  *
  * \param n The network configuration that this function will apply to.
  *

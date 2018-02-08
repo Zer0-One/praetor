@@ -45,7 +45,7 @@ int config_load(char* path){
     srandom(time(NULL));
     json_error_t error;
     //if we're reloading the config, free the old one
-    if(root){
+    if(root != NULL){
         json_decref(root);
     }
     root = json_load_file(path, 0, &error);
@@ -114,7 +114,16 @@ int config_load(char* path){
                 logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                 return -1;
             }
-            htable_add(rc_plugin, (uint8_t*)plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
+            
+            int ret = htable_add(rc_plugin, (uint8_t*)plugin_this->name, strlen(plugin_this->name)+1, plugin_this);
+            if(ret == -1){
+                logmsg(LOG_ERR, "config: Could not add configuration for plugin %s, plugin already exists\n", plugin_this->name);
+                _exit(-1);
+            }
+            else if(ret == -2){
+                logmsg(LOG_ERR, "config: Could not add configuration for plugin %s, the system is out of memory\n", plugin_this->name);
+                _exit(-1);
+            }
             logmsg(LOG_DEBUG, "config: Added configuration for plugin %s\n", plugin_this->name);
         }
     }
@@ -140,6 +149,11 @@ int config_load(char* path){
             //instantiate hash tables for this network
             network_this->channels = htable_create(10);
             network_this->plugins = htable_create(10);
+            if(network_this->channels == NULL || network_this->plugins == NULL){
+                logmsg(LOG_ERR, "config: Could not create network configuration, the system is out of memory\n");
+                _exit(-1);
+            }
+
             int ret = json_unpack_ex(
                 value,
                 &error,
@@ -163,7 +177,15 @@ int config_load(char* path){
                 return -1;
             }
             //add this networkinfo to the global hash table, indexed by its name
-            htable_add(rc_network, (uint8_t*)network_this->name, strlen(network_this->name)+1, network_this);
+            ret = htable_add(rc_network, (uint8_t*)network_this->name, strlen(network_this->name)+1, network_this);
+            if(ret == -1){
+                logmsg(LOG_ERR, "config: Could not add configuration for network %s, network already exists\n", network_this->name);
+                _exit(-1);
+            }
+            else if(ret == -2){
+                logmsg(LOG_ERR, "config: Could not add configuration for network %s, the system is out of memory\n", network_this->name);
+                _exit(-1);
+            }
             logmsg(LOG_DEBUG, "config: Added configuration for network %s\n", network_this->name);
         
 
@@ -210,7 +232,15 @@ int config_load(char* path){
                         logmsg(LOG_ERR, "config: %s at line %d, column %d. Source: %s\n", error.text, error.line, error.column, error.source);
                         return -1;
                     }
-                    htable_add(network_this->channels, (uint8_t*)channel_this->name, strlen(channel_this->name)+1, channel_this);
+                    ret = htable_add(network_this->channels, (uint8_t*)channel_this->name, strlen(channel_this->name)+1, channel_this);
+                    if(ret == -1){
+                        logmsg(LOG_ERR, "config: Could not add configuration for channel %s, channel already exists\n", channel_this->name);
+                        _exit(-1);
+                    }
+                    else if(ret == -2){
+                        logmsg(LOG_ERR, "config: Could not add configuration for channel %s, the system is out of memory\n", channel_this->name);
+                        _exit(-1);
+                    }
                     logmsg(LOG_DEBUG, "config: Added channel %s to network %s\n", channel_this->name, network_this->name);
                 }
             }

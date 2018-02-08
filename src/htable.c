@@ -253,6 +253,8 @@ int htable_remove(struct htable* table, const uint8_t* key, size_t key_size){
             }
 
             free(this);
+            table->mapping_count--;
+            
             return 0;
         }
     }

@@ -25,7 +25,7 @@
 #include "log.h"
 #include "nexus.h"
 
-int irc_msg_recv(struct network* n, char* buf, size_t len){
+int irc_recv(struct network* n, char* buf, size_t len){
     char* eom = strstr(n->recv_queue, "\r\n");
     if(eom == NULL){
         return -1;
@@ -56,37 +56,51 @@ int irc_msg_recv(struct network* n, char* buf, size_t len){
 }
 
 int irc_register_connection(const struct network* n){
-    if(n->pass != 0){
-        if(irc_pass(n, n->pass) == -1){
-            logmsg(LOG_WARNING, "irc: Could not set connection password on network '%s'\n", n->name);
-            goto fail;
+    if(n->pass != NULL){
+        char* pass = ircmsg_pass(n->pass);
+        if(pass == NULL){
+            goto fail_pass;
         }
-    }
-    
-    if(irc_nick(n, n->nick) == -1){
-        logmsg(LOG_WARNING, "irc: Could not set nickname on network '%s'\n", n->name);
-        if(n->pass != 0){
-            free(queue_dequeue(n->send_queue));
+        if(queue_enqueue(n->send_queue, pass, strlen(pass)) == -1){
+            goto fail_pass;
         }
-        goto fail;
-    }
-    //logmsg(LOG_DEBUG, "we crafted the nick msg\n");
-    
-    if(irc_user(n, n->user, n->real_name) == -1){
-        logmsg(LOG_WARNING, "irc: Could not set username on network '%s'\n", n->name);
-        if(n->pass != 0){
-            free(queue_dequeue(n->send_queue));
-        }
-        free(queue_dequeue(n->send_queue));
-        goto fail;
     }
 
-    logmsg(LOG_DEBUG, "irc: Connection registered with network '%s'\n", n->name);
+    char* nick = ircmsg_nick(n->nick);
+    if(nick == NULL){
+        goto fail_nick;
+    }
+    if(queue_enqueue(n->send_queue, nick, strlen(nick)) == -1){
+        goto fail_nick;
+    }
+
+    //mode is hard-coded here because we haven't made this a user-configurable option yet
+    char* user = ircmsg_user(n->user, "0", n->real_name);
+    if(user == NULL){
+        goto fail_user;
+    }
+    if(queue_enqueue(n->send_queue, user, strlen(user)) == -1){
+        goto fail_user;
+    }
+
     return 0;
 
-    fail:
-        logmsg(LOG_WARNING, "irc: Failed to register connection with network '%s'\n", n->name);
-        return -1;
+    fail_pass:
+            logmsg(LOG_WARNING, "irc: Could not register connection with network %s, unable to set connection password\n", n->name);
+            return -1;
+    fail_nick:
+            if(n->pass != NULL){
+                free(queue_dequeue(n->send_queue));
+            }
+            logmsg(LOG_WARNING, "irc: Could not register connection with network %s, unable to set nickname\n", n->name);
+            return -1;
+    fail_user:
+            if(n->pass != NULL){
+                free(queue_dequeue(n->send_queue));
+            }
+            free(queue_dequeue(n->send_queue));
+            logmsg(LOG_WARNING, "irc: Could not register connection with network %s, unable to set username/hostname/realname\n", n->name);
+            return -1;
 }
 
 int irc_join_all(const struct network* n){
@@ -96,55 +110,54 @@ int irc_join_all(const struct network* n){
         return -1;
     }
 
-    for(size_t i = 0; i < size; i++){
+    size_t i;
+    for(i = 0; i < size; i++){
         struct channel* c = htable_lookup(n->channels, channels[i]->key, strlen((char*)channels[i]->key)+1);
-        if(irc_join(n, c->name, c->key) == -1){
-            //If we don't have enough memory to queue all of the join messages, then don't send any at all
-            for(size_t j = 0; j <= i; j++){
-                queue_dequeue(n->send_queue);
-            }
-            htable_key_list_free(channels, size);
-            logmsg(LOG_WARNING, "irc: Could not join channel '%s' on network '%s'", c->name, n->name);
-            return -1;
+
+        char* join = ircmsg_join(c->name, c->key);
+        if(join == NULL){
+            logmsg(LOG_WARNING, "irc: Could not queue JOIN messages for network '%s', the system is out of memory\n", n->name);
+            goto fail;
+        }
+
+        if(queue_enqueue(n->send_queue, join, strlen(join)) == -1){
+            logmsg(LOG_WARNING, "irc: Could not join channel '%s' on network '%s' because a JOIN message could not be queued, the system is out of memory\n", c->name, n->name);
+            goto fail;
         }
     }
 
     htable_key_list_free(channels, size);
 
     return 0;
+
+    fail:
+        //If we don't have enough memory to queue all of the join messages, then don't send any at all
+        for(size_t j = 0; j < i; j++){
+            free(queue_dequeue(n->send_queue));
+        }
+        htable_key_list_free(channels, size);
+        return -1;
 }
 
-int irc_handle_ping(const struct network* n, const char* buf){
-    if(strstr(buf, "PING") != buf){
+int irc_handle_ping(const struct network* n, const struct ircmsg* msg){
+    //If this isn't actually PING, we could segfault
+    if(msg->type != PING){
+        logmsg(LOG_ERR, "irc: Attempted to handle PING, but the message type was incorrect\n");
+        _exit(-1);
+    }
+
+    char* pong = ircmsg_pong(n->user, msg->ping->server);
+    if(pong == NULL){
+        logmsg(LOG_WARNING, "irc: Unable to handle PING message, could not craft response message\n");
         return -1;
     }
 
-    char* tmp;
-    const char* ptr;
-
-    //If there's a message prefix, skip it
-    if(buf[0] != ':'){
-        ptr = buf;
-    }
-    else{
-        ptr = strchr(buf, ' ') + 1;
+    if(queue_enqueue(n->send_queue, pong, strlen(pong)) == -1){
+        logmsg(LOG_WARNING, "irc: Unable to handle PING message, could not queue response\n");
+        free(pong);
+        return -1;
     }
 
-    tmp = calloc(1, strlen(ptr));
-    if(tmp == NULL){
-        return -2;
-    }
-
-    strncpy(tmp, ptr, strlen(ptr));
-    //Do you like this
-    tmp[1] = 'O';
-
-    if(queue_enqueue(n->send_queue, tmp, strlen(buf))){
-        logmsg(LOG_WARNING, "irc: Could not reply to PING message from network '%s'\n", n->name);
-        free(tmp);
-        return -2;
-    }
-
-    free(tmp);
+    free(pong);
     return 0;
 }

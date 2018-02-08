@@ -10,29 +10,128 @@
 * can be found in the "LICENSE" file bundled with this source distribution.
 */
 
-/** \file ircmsg.h
- * The functions in this module implement the IRC message types described in
- * RFC 2812 \<<https://tools.ietf.org/html/rfc2812>\>.
- *
- * These functions automatically queue the generated message for sending.
- *
- * On success, they return 0, and on failure they return -1. Currently, these
- * functions can only fail if the system is out of memory.
- */
-
 #ifndef PRAETOR_IRCMSG
 #define PRAETOR_IRCMSG
 
+#include <limits.h>
+#include <stdbool.h>
+
+#include <jansson.h>
+
 /**
- * \param channels As described in RFC 2812, a comma-delimited list of
- *                 channels.
- * \param keys     As described in RFC 2812, a comma-delimited list of keys. If
- *                 no keys are necessary, this parameter may be set to NULL.
+ * The maximum number of command parameters in an IRC message.
  */
-int irc_join(const struct network* n, const char* channels, const char* keys);
-int irc_nick(const struct network* n, const char* nick);
-int irc_pass(const struct network* n, const char* pass);
-int irc_pong(const struct network* n, const char* sender);
-int irc_user(const struct network* n, const char* user, const char* real_name);
+#define IRCMSG_CMD_PARAMS_MAX 15
+/**
+ * The maximum size, in bytes, of an IRC message, including the terminating
+ * carriage-return and newline characters.
+ */
+#define IRCMSG_SIZE_MAX 512
+/**
+ * The maximum size, in bytes, of an IRC message, not including the terminating
+ * carriage-return and newline characters.
+ */
+#define IRCMSG_BODY_MAX 510
+/**
+ * The maximum size, in bytes, of a buffer required to hold a null-terminated
+ * IRC message string.
+ */
+#define IRCMSG_SIZE_BUF 513
+
+enum ircmsg_type{
+    PRIVMSG = 0,
+    PING = 1,
+    PONG = 2,
+    UNKNOWN = INT_MAX
+};
+
+struct ircmsg_ping{
+    char* server;
+    char* server2;
+};
+
+struct ircmsg_pong{
+    char* server;
+    char* server2;
+};
+
+struct ircmsg_privmsg{
+    char* target;
+    char* msg;
+    bool is_hilight;
+    bool is_pm;
+};
+
+struct ircmsg{
+    //Common fields
+    enum ircmsg_type type;
+    char* network;
+    char* sender;
+    char* user;
+    char* host;
+    char* cmd;
+    //Command-specific fields
+    union {
+        struct ircmsg_privmsg* privmsg;
+        struct ircmsg_ping* ping;
+        struct ircmsg_pong* pong;
+    };
+};
+
+/**
+ * Parses the given IRC message into an ircmsg struct.
+ *
+ * The ircmsg struct returned by this function is dynamically allocated and
+ * must be freed by the caller.
+ *
+ * \param network The network that the given message was destined to, or was
+ *                received from.
+ * \param msg     The IRC message to parse, with or without a terminating
+ *                carriage-return and newline.
+ * \param len     The length of the given IRC message.
+ *
+ * \return An dynamically-allocated ircmsg struct on success.
+ * \return NULL on failure.
+ */
+struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len);
+
+/**
+ * Frees the memory associated with the given ircmsg struct.
+ *
+ * This function is meant to work with ircmsg structs that are allocated both
+ * dynamically or on the stack, and does not free the struct itself; it only
+ * frees memory associated with the fields contained within the object.
+ */
+void ircmsg_free(struct ircmsg* msg);
+
+/**
+ * Packs the fields of the given ircmsg struct into a json_t JSON object.
+ *
+ * \return A JSON object on success.
+ * \return NULL if the system was out of memory.
+ */
+json_t* ircmsg_to_json(const struct ircmsg* msg);
+
+/**
+ * Unpacks the given JSON object into an ircmsg struct.
+ *
+ * \return An ircmsg struct on success.
+ * \return NULL on failure.
+ */
+struct ircmsg* ircmsg_from_json(const json_t* obj);
+
+/**
+ * The functions below implement the IRC message types described in RFC 2812
+ * \<<https://tools.ietf.org/html/rfc2812>\>.
+ *
+ * On success, these functions return a dynamically-allocated string, and on
+ * failure they return NULL.
+ */
+char* ircmsg_join(const char* channels, const char* keys);
+char* ircmsg_nick(const char* nick);
+char* ircmsg_pass(const char* pass);
+char* ircmsg_pong(const char* server, const char* server2);
+char* ircmsg_privmsg(const char* msgtarget, const char* text);
+char* ircmsg_user(const char* user, const char* mode, const char* real_name);
 
 #endif
