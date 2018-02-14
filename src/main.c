@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015-2017 David Zero
+* Copyright (c) 2015-2018 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]){
                 print_usage();
                 _exit(0);
             case 'v':
-                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015-2017 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
+                printf("\npraetor Version: %s\nCommit Hash: %s\nCopyright 2015-2018 David Zero\n\n", PRAETOR_VERSION, COMMIT_HASH);
                 printf("This build of praetor has been compiled with support for:\n");
                 printf("Jansson Version: %s\n", JANSSON_VERSION);
                 printf("LibreSSL Version: %s\n\n", LIBRESSL_VERSION_TEXT);

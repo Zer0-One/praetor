@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015-2017 David Zero
+* Copyright (c) 2015-2018 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -25,6 +25,8 @@
 #include "queue.h"
 
 struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
+    struct ircmsg* ret = NULL;
+    
     char* sender = NULL;
     char* user = NULL;
     char* host = NULL;
@@ -147,7 +149,7 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
     }
     strcpy(cmd, tok);
 
-    struct ircmsg* ret = malloc(sizeof(struct ircmsg));
+    ret = malloc(sizeof(struct ircmsg));
     if(ret == NULL){
         goto fail_oom;
     }
@@ -166,6 +168,9 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
             //If the trailing arg was a single word, save it and break
             if(tok2 == NULL){
                 argv[i] = malloc(strlen(tok) + 1);
+                if(argv[i] == NULL){
+                    goto fail_oom;
+                }
                 //+1 to exclude the trailing argument delimiter, ':'
                 strcpy(argv[i], tok + 1);
                 
@@ -175,6 +180,9 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
 
             //Otherwise, combine the two tokens
             argv[i] = malloc(strlen(tok) + strlen(tok2) + 1);
+            if(argv[i] == NULL){
+                goto fail_oom;
+            }
 
             strncpy(argv[i], tok, strlen(tok));
             strncpy(argv[i] + strlen(tok), tok2, strlen(tok2) + 1);
@@ -197,7 +205,7 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
     //the non-optional arg, "arg2". If you got two args, the first *must* be
     //the optional arg, "arg1".
     if(strcasecmp(cmd, "PING") == 0){
-        if(argc > 2 || argc < 1){
+        if(argc != 1 && argc != 2){
             logmsg(LOG_WARNING, "ircmsg: Parsing error, expected 1-2 arguments for command '%s', got %zd\n", cmd, argc);
             goto fail;
         }
@@ -233,18 +241,46 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
         ret->privmsg = privmsg;
     }
     else if(strcasecmp(cmd, "JOIN") == 0){
-        
+        if(argc != 1 && argc != 2){
+            logmsg(LOG_WARNING, "ircmsg: Parsing error, expected 1-2 arguments for command '%s', got %zd\n", cmd, argc);
+            goto fail;
+        }
+
+        struct ircmsg_join* join = malloc(sizeof(struct ircmsg_join));
+        if(join == NULL){
+            goto fail_oom;
+        }
+
+        join->channel = argv[0];
+        if(argc == 2){
+            join->key = argv[1];
+        }
+
+        ret->type = JOIN;
+        ret->join = join;
     }
-    else if(strcasecmp(cmd, "PART") == 0){
-        
-    }
-    else if(strcasecmp(cmd, "QUIT") == 0){
-        
-    }
+    //else if(strcasecmp(cmd, "PART") == 0){
+    //    
+    //}
+    //else if(strcasecmp(cmd, "QUIT") == 0){
+    //    
+    //}
     else{
+        struct ircmsg_unknown* unknown = malloc(sizeof(struct ircmsg_unknown) + (sizeof(char*) * argc));
+        if(unknown == NULL){
+            goto fail_oom;
+        }
+
+        unknown->argc = argc;
+        for(size_t i = 0; i < argc; i++){
+            unknown->argv[i] = argv[i];
+        }
+
         ret->type = UNKNOWN;
+        ret->unknown = unknown;
     }
 
+    //To-Do: Do you need to +1 this strlen()?
     char* n = malloc(strlen(network));
     if(n == NULL){
         goto fail_oom;
@@ -273,6 +309,7 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len){
     fail:
     logmsg(LOG_DEBUG, "ircmsg: Could not parse message: %s\n", msg);
 
+    free(ret);
     free(sender);
     free(user);
     free(host);
@@ -327,6 +364,8 @@ char* ircmsg_join(const char* channels, const char* keys){
 
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft JOIN message, %s\n", strerror(errno));
+        
+        free(msg);
         return NULL;
     }
 
@@ -347,6 +386,8 @@ char* ircmsg_nick(const char* nick){
     int count = snprintf(msg, IRCMSG_SIZE_BUF, "NICK %s\r\n", nick);
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft NICK message, %s\n", strerror(errno));
+
+        free(msg);
         return NULL;
     }
 
@@ -367,6 +408,8 @@ char* ircmsg_pass(const char* pass){
     int count = snprintf(msg, IRCMSG_SIZE_BUF, "PASS :%s\r\n", pass);
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft PASS message, %s\n", strerror(errno));
+
+        free(msg);
         return NULL;
     }
 
@@ -394,6 +437,8 @@ char* ircmsg_pong(const char* server, const char* server2){
     
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft PONG message, %s\n", strerror(errno));
+
+        free(msg);
         return NULL;
     }
 
@@ -417,6 +462,8 @@ char* ircmsg_privmsg(const char* msgtarget, const char* text){
     int count = snprintf(msg, IRCMSG_SIZE_BUF, "PRIVMSG %s :%s\r\n", msgtarget, text);
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft PRIVMSG message, %s\n", strerror(errno));
+
+        free(msg);
         return NULL;
     }
 
@@ -437,6 +484,8 @@ char* ircmsg_user(const char* user, const char* mode, const char* real_name){
     int count = snprintf(msg, IRCMSG_SIZE_BUF, "USER %s %s * :%s\r\n", user, mode, real_name);
     if(count < 0){
         logmsg(LOG_WARNING, "ircmsg: Could not craft USER message, %s\n", strerror(errno));
+
+        free(msg);
         return NULL;
     }
 

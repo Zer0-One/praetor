@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015-2017 David Zero
+* Copyright (c) 2015-2018 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -39,10 +39,16 @@
 #define IRCMSG_SIZE_BUF 513
 
 enum ircmsg_type{
-    PRIVMSG = 0,
-    PING = 1,
-    PONG = 2,
+    JOIN = 0,
+    PRIVMSG = 1,
+    PING = 2,
+    PONG = 3,
     UNKNOWN = INT_MAX
+};
+
+struct ircmsg_join{
+    char* channel;
+    char* key;
 };
 
 struct ircmsg_ping{
@@ -62,6 +68,11 @@ struct ircmsg_privmsg{
     bool is_pm;
 };
 
+struct ircmsg_unknown{
+    size_t argc;
+    char* argv[];
+};
+
 struct ircmsg{
     //Common fields
     enum ircmsg_type type;
@@ -72,9 +83,11 @@ struct ircmsg{
     char* cmd;
     //Command-specific fields
     union {
+        struct ircmsg_join* join;
         struct ircmsg_privmsg* privmsg;
         struct ircmsg_ping* ping;
         struct ircmsg_pong* pong;
+        struct ircmsg_unknown* unknown;
     };
 };
 

@@ -2,7 +2,7 @@
 * This source file is part of praetor, a free and open-source IRC bot,
 * designed to be robust, portable, and easily extensible.
 *
-* Copyright (c) 2015-2017 David Zero
+* Copyright (c) 2015-2018 David Zero
 * All rights reserved.
 *
 * The following code is licensed for use, modification, and redistribution
@@ -125,6 +125,7 @@ int htable_rehash(struct htable* table, size_t scale){
     for(size_t i = 0; i < size; i++){
         void* value = htable_lookup(table, key_list[i]->key, key_list[i]->key_size);
         if(htable_add(tmp_table, key_list[i]->key, key_list[i]->key_size, value) == -2){
+            htable_key_list_free(key_list, size);
             htable_destroy(tmp_table);
             return -1;
         }

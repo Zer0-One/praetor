@@ -46,7 +46,7 @@ create packages for every major distro.
 
 ## License
 
-    Copyright (c) 2015-2017 David Zero
+    Copyright (c) 2015-2018 David Zero
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without

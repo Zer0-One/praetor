@@ -25,8 +25,9 @@ bin/praetor_debug : src/*.c include/*.h
 		$(cc) -g3 -std=c11 -pedantic-errors -Wall -Wextra -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o $@
 		chmod +x bin/praetor_debug
 
-analyze : src/*.c
-		scan-build -v -o analysis $(cc) -g3 -std=c11 -pedantic-errors -Wall -Wextra -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls $+ -o praetor
+analyze :
+		mkdir -p bin
+		scan-build -v -o analysis $(cc) -g3 -std=c11 -pedantic-errors -Wall -Wextra -D_XOPEN_SOURCE=600 -DCOMMIT_HASH=$(commit_hash) -DPRAETOR_VERSION=$(praetor_version) -Iinclude/ -ljansson -ltls src/*.c -o bin/praetor_debug
 		chmod +x bin/praetor
 
 test :
@@ -47,4 +48,4 @@ clean :
 		-rm test/test_runner.c
 
 all : clean docs praetor test
-all-debug : clean docs praetor-debug test
+all-debug : clean docs analyze test
