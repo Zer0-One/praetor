@@ -35,7 +35,7 @@ struct htable* rc_plugin, * rc_plugin_sock;
 
 json_t* root = NULL;
 
-void initconfig(struct praetor* rc_praetor){
+void config_init(struct praetor* rc_praetor){
     rc_praetor->user = "praetor";
     rc_praetor->group = "praetor";
     rc_praetor->workdir = "/var/lib/praetor";
@@ -55,7 +55,7 @@ int config_load(char* path){
         return -1;
     }
 
-    initconfig(rc_praetor);
+    config_init(rc_praetor);
     json_t* praetor_section = NULL, *networks_section = NULL, *plugins_section;
     
     //Unpack and validate root object
@@ -124,6 +124,9 @@ int config_load(char* path){
                 logmsg(LOG_ERR, "config: Could not add configuration for plugin %s, the system is out of memory\n", plugin_this->name);
                 _exit(-1);
             }
+
+            plugin_this->sock = -1;
+
             logmsg(LOG_DEBUG, "config: Added configuration for plugin %s\n", plugin_this->name);
         }
     }

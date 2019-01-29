@@ -15,19 +15,18 @@
 
 #include <jansson.h>
 
+#include "config.h"
+#include "ircmsg.h"
+
 /**
- * Loads an executable plugin from the given path. The executable will be
- * forked, and its standard streams will be directed over an anonymous domain
- * socket toward praetor.
- *
- * \param path The filesystem path to the executable to be loaded. Relative
- *             paths will be based in praetor's configured working directory; absolute
- *             paths are used verbatim.
+ * Loads an executable plugin from its configured path. The executable will be
+ * forked, and its standard streams will be directed over an anonymous UNIX
+ * domain socket toward praetor.
  *
  * \return 0 on success.
  * \return -1 if the plugin could not be loaded.
  */
-int plugin_load(const char* path);
+int plugin_load(struct plugin* p);
 
 /**
  * Calls plugin_load() for every plugin defined in praetor's configuration.
@@ -42,12 +41,10 @@ int plugin_load_all();
  * rc_plugin and rc_plugin_sock hash tables, closing its socket connection, and
  * then terminating its process.
  *
- * \param name The handle indexing the plugin in the rc_plugin hash table.
- *
  * \return 0 on success.
  * \return -1 if the plugin could not be terminated successfully.
  */
-int plugin_unload(const char* name);
+int plugin_unload(struct plugin* p);
 
 /**
  * Calls plugin_unload() for every plugin currently loaded and indexed by the
@@ -61,12 +58,10 @@ int plugin_unload_all();
 /**
  * Calls plugin_unload() and plugin_load() for the specified plugin.
  *
- * \param name The handle indexing the plugin in the rc_plugin hash table.
- *
  * \return 0 on success.
  * \return -1 if the plugin could not be terminated/started successfully.
  */
-int plugin_reload(const char* name);
+int plugin_reload(struct plugin* p);
 
 /**
  * Calls plugin_reload() for every plugin currently loaded and indexed by the
@@ -78,23 +73,37 @@ int plugin_reload(const char* name);
 int plugin_reload_all();
 
 /**
+ * Converts the given IRC message into a JSON message, and sends it to the
+ * given plugin.
+ *
+ * If the message could not be sent, the plugin will be reloaded via
+ * plugin_reload().
+ *
+ * \return 0 on success.
+ * \return -1 on failure to send the JSON message.
+ * \return -2 on failure to convert the given IRC message into a JSON message.
+ */
+int plugin_send(struct plugin* p, struct ircmsg* msg);
+
+/**
  * Reads a JSON message from the specified plugin.
  *
- * \param name The handle indexing the plugin in the rc_plugin hash table.
+ * If the message could not be loaded or parsed, the plugin will be reloaded
+ * via plugin_reload().
  *
  * \return A pointer to the received JSON object on success.
  * \return NULL if input could not be read successfully.
  */
-json_t* plugin_recv(const struct plugin* p);
+json_t* plugin_recv(struct plugin* p);
 
 /**
  * Returns a pointer to the name of the plugin author(s).
  */
-const char* plugin_get_author(const char* name);
+const char* plugin_get_author(const struct plugin* p);
 
 /**
  * Returns a pointer to a description of the plugin.
  */
-const char* plugin_get_description(const char* name);
+const char* plugin_get_description(const struct plugin* p);
 
 #endif

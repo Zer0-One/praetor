@@ -43,7 +43,7 @@ void logprintf(int loglevel, char* msg, ...){
         printf("%s Debug: ", date_buffer);
     }
     else if(loglevel == LOG_EMERG){
-        printf("%s Alert: ", date_buffer);
+        printf("%s Emergency: ", date_buffer);
     }
     else if(loglevel == LOG_ERR){
         printf("%s Error: ", date_buffer);

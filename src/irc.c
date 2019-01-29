@@ -25,6 +25,16 @@
 #include "log.h"
 #include "nexus.h"
 
+int irc_send(struct network* n, char* buf, size_t len){
+    if(queue_enqueue(n->send_queue, buf, len) == -1){
+        logmsg(LOG_WARNING, "irc: Could not queue message for sending to network '%s'\n", n->name);
+        logmsg(LOG_DEBUG, "irc: Failed to send message:\n%.*s\n", (int)len, buf);
+        return -1;
+    }
+
+    return 0;
+}
+
 int irc_recv(struct network* n, char* buf, size_t len){
     char* eom = strstr(n->recv_queue, "\r\n");
     if(eom == NULL){

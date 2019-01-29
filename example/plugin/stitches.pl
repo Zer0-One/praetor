@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use warnings;
 use strict;
@@ -21,7 +21,7 @@ sub irc_privmsg{
     my ($network, $target, $msg, $sender) = @_;
 
     my $privmsg = {
-        type => "privmsg",
+        cmd => "PRIVMSG",
         network => $network,
         target => $target,
         msg => $msg
@@ -58,17 +58,23 @@ sub match{
 my $obj;
 
 while(<STDIN>){
+    if(!defined($_)){
+        open(my $file, '>', "/home/zero-one/error.log");
+        print $file "Error: ".$!."\n";
+        close($file);
+        die;
+    }
     $obj = $json->incr_parse($_);
     if(defined($obj)){
-        my $type = $obj->{'type'};
+        my $cmd = $obj->{'cmd'};
 
-        if($type eq 'join'){
+        if(lc($cmd) eq 'join'){
             print(irc_privmsg($obj->{'network'}, $obj->{'channel'}, $stitchisms[3]));
         }
-        elsif($type eq 'part'){
+        elsif(lc($cmd) eq 'part'){
             print(irc_privmsg($obj->{'network'}, $obj->{'channel'}, $stitchisms[4]));
         }
-        elsif($type eq 'privmsg'){
+        elsif(lc($cmd) eq 'privmsg'){
             # If this was a PM, send to the user who sent us the PM
             my $target;
             if($obj->{'is_pm'} == JSON::true){

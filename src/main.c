@@ -121,9 +121,9 @@ int main(int argc, char* argv[]){
     }
 
     //connect to IRC
-    if(inet_connect_all() == -1){
-        logmsg(LOG_WARNING, "main: Could not connect to any IRC networks\n");
-    }
+    //if(inet_connect_all() == -1){
+    //    logmsg(LOG_WARNING, "main: Could not connect to any IRC networks\n");
+    //}
 
     //main event loop
     while(true){

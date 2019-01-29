@@ -16,6 +16,14 @@
 #include "ircmsg.h"
 
 /**
+ * Queues the given IRC message for sending.
+ *
+ * No formatting will be done on the given message; it should be a complete IRC
+ * message, ready to be sent as-is.
+ */
+int irc_send(const struct network* n, char* buf, size_t len);
+
+/**
  * Scans the receive queue belonging to the given network for a complete IRC
  * message. If a message is found, it is copied to \c buf .
  *

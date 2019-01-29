@@ -1,7 +1,6 @@
 analysis/
 bin/
 doc/*
-!doc/Dockerfile
 
 *.swp
 .clang_complete

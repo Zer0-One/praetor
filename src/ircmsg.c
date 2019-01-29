@@ -19,6 +19,8 @@
 #include <strings.h>
 #include <unistd.h>
 
+#include <jansson.h>
+
 #include "config.h"
 #include "ircmsg.h"
 #include "log.h"
@@ -494,4 +496,135 @@ char* ircmsg_user(const char* user, const char* mode, const char* real_name){
     }
 
     return msg;
+}
+
+json_t* ircmsg_to_json(const struct ircmsg* msg){
+    json_error_t error;
+    json_t* specific = NULL;
+    //Pack the 5 fields common to all messages: network, sender, user, host, cmd
+    json_t* common = json_pack_ex(
+        &error,
+        0,
+        "{s:s, s:s?, s:s?, s:s?, s:s}",
+        "network", msg->network,
+        "sender", msg->sender,
+        "user", msg->user,
+        "host", msg->host,
+        "cmd", msg->cmd
+    );
+
+    if(common == NULL){
+        logmsg(LOG_WARNING, "ircmsg: Could not build JSON message from IRC message, unable to pack common object\n");
+        logmsg(LOG_WARNING, "ircmsg: %s in %s at line %d, column %d\n", error.text, error.source, error.line, error.column);
+        goto fail;
+    }
+
+    switch(msg->type){
+        case JOIN:
+            specific = json_pack_ex(
+                &error,
+                0,
+                "{s:s, s:s}",
+                "channel", msg->join->channel,
+                "key", msg->join->key
+            );
+            break;
+        case PRIVMSG:
+            specific = json_pack_ex(
+                &error,
+                0,
+                "{s:s, s:s, s:b, s:b}",
+                "target", msg->privmsg->target,
+                "msg", msg->privmsg->msg,
+                "is_hilight", msg->privmsg->is_hilight,
+                "is_pm", msg->privmsg->is_pm
+            );
+            break;
+        //case UNKNOWN:
+        //    break;
+    }
+
+    if(specific == NULL){
+        logmsg(LOG_WARNING, "ircmsg: Could not build JSON message from IRC message, unable to pack specific object\n");
+        logmsg(LOG_WARNING, "ircmsg: %s in %s at line %d, column %d\n", error.text, error.source, error.line, error.column);
+        goto fail;
+    }
+
+    if(json_object_update_missing(common, specific) == -1){
+        logmsg(LOG_WARNING, "ircmsg: Could not build JSON message from IRC message, unable to update object\n");
+        goto fail;
+    }
+
+    json_decref(specific);
+
+    return common;
+
+    fail:
+        json_decref(common);
+        json_decref(specific);
+        return NULL;
+}
+
+char* ircmsg_from_json(json_t* obj, char** network){
+    struct ircmsg* msg = calloc(1, sizeof(struct ircmsg));
+    if(msg == NULL){
+        logmsg(LOG_WARNING, "ircmsg: Could not build IRC message from JSON message, the system is out of memory\n");
+        return NULL;
+    }
+
+    char* msgbuf = NULL;
+
+    json_error_t error;
+
+    int ret = json_unpack_ex(
+        obj,
+        &error,
+        0,
+        "{s:s, s?s, s?s, s?s, s:s}",
+        "network", msg->network,
+        "sender", msg->sender,
+        "user", msg->user,
+        "host", msg->host,
+        "cmd", msg->cmd
+    );
+
+    if(ret == -1){
+        logmsg(LOG_WARNING, "ircmsg: Could not build IRC message from JSON message, unable to unpack common object\n");
+        goto fail;
+    }
+    
+    if(strcasecmp(msg->cmd, "PRIVMSG") == 0){
+        ret = json_unpack_ex(
+            obj,
+            &error,
+            0,
+            "{s:s, s:s}",
+            "target", msg->privmsg->target,
+            "msg", msg->privmsg->msg
+        );
+
+        if(ret == -1){
+            logmsg(LOG_WARNING, "ircmsg: Could not build IRC message from JSON message, unable to unpack PRIVMSG object\n");
+            goto fail;
+        }
+
+        msgbuf = ircmsg_privmsg(msg->privmsg->target, msg->privmsg->msg);
+    }
+    
+    *network = malloc(strlen(msg->network)+1);
+    if(*network == NULL){
+        logmsg(LOG_WARNING, "ircmsg: Could not return network from JSON message, the system is out of memory\n");
+        free(msg);
+        free(msgbuf);
+        return NULL;
+    }
+    strcpy(*network, msg->network);
+
+    return msgbuf;
+
+    fail:
+        logmsg(LOG_WARNING, "%s in %s at line %d, column %d\n", error.text, error.source, error.line, error.column);
+        free(msg);
+        free(msgbuf);
+        return NULL;
 }

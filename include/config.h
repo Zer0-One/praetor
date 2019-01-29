@@ -166,6 +166,18 @@ struct network{
 };
 
 /**
+ * The current status of the plugin, which is one of:
+ *  - Loaded: The plugin process is running and being tracked by internal state.
+ *  - Unloaded: The plugin process has died and cleanup has been performed.
+ *  - Dead: The plugin process has died, but no cleanup has yet been performed.
+ */
+enum plugin_status{
+    PLUGIN_LOADED = 0,
+    PLUGIN_UNLOADED = 1,
+    PLUGIN_DEAD = -1
+};
+
+/**
  * This struct represents the configuration of a loaded plugin
  */
 struct plugin{
@@ -173,6 +185,10 @@ struct plugin{
      * A handle for the plugin, to be used as an index in hash tables.
      */
     char* name;
+    /**
+     * The current status of the plugin.
+     */
+    enum plugin_status status;
     /**
      * The process ID of the child process spawned for this plugin.
      */

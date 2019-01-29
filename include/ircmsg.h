@@ -95,7 +95,7 @@ struct ircmsg{
  * Parses the given IRC message into an ircmsg struct.
  *
  * The ircmsg struct returned by this function is dynamically allocated and
- * must be freed by the caller.
+ * must be freed by the caller via ircmsg_free().
  *
  * \param network The network that the given message was destined to, or was
  *                received from.
@@ -118,27 +118,34 @@ struct ircmsg* ircmsg_parse(const char* network, const char* msg, size_t len);
 void ircmsg_free(struct ircmsg* msg);
 
 /**
- * Packs the fields of the given ircmsg struct into a json_t JSON object.
+ * Packs the fields of the given ircmsg struct into a json_t JSON object. The
+ * returned object must be freed by the caller via json_decref().
  *
  * \return A JSON object on success.
- * \return NULL if the system was out of memory.
+ * \return NULL on failure.
  */
 json_t* ircmsg_to_json(const struct ircmsg* msg);
 
 /**
  * Unpacks the given JSON object into an ircmsg struct.
  *
+ * The returned IRC message string must be freed by the caller. The network to
+ * which this message is destined will be stored at the pointer pointed to by
+ * \c network. This string must also be freed by the caller.
+ *
+ * \param[out] network The network to which this message is destined.
+ *
  * \return An ircmsg struct on success.
  * \return NULL on failure.
  */
-struct ircmsg* ircmsg_from_json(const json_t* obj);
+char* ircmsg_from_json(json_t* obj, char** network);
 
 /**
  * The functions below implement the IRC message types described in RFC 2812
  * \<<https://tools.ietf.org/html/rfc2812>\>.
  *
- * On success, these functions return a dynamically-allocated string, and on
- * failure they return NULL.
+ * On success, these functions return a dynamically-allocated string which must
+ * be freed by the caller. On failure they return NULL.
  */
 char* ircmsg_join(const char* channels, const char* keys);
 char* ircmsg_nick(const char* nick);

@@ -21,6 +21,7 @@
 #include "irc.h"
 #include "log.h"
 #include "nexus.h"
+#include "plugin.h"
 
 volatile sig_atomic_t sigchld = 0;
 volatile sig_atomic_t sighup = 0;
@@ -89,13 +90,26 @@ int sigchld_handler(){
     while((pid = waitpid(-1, &wstatus, WNOHANG)) > 0){
         for(size_t i = 0; i < size; i++){
             p = htable_lookup(rc_plugin, plugins[i]->key, plugins[i]->key_size);
-            if(p->pid == pid){
+            if(pid == p->pid){
+                if(p->status == PLUGIN_UNLOADED){
+                    logmsg(LOG_WARNING, "signals: Plugin '%s' successfully terminated via unload\n", p->name);
+                }
+                else if (p->status == PLUGIN_LOADED){
+                    logmsg(LOG_WARNING, "signals: Plugin '%s' terminated unexpectedly\n", p->name);
+                    p->status = PLUGIN_DEAD;
+                    plugin_unload(p);
+                }
+                else{
+                    //Process was waited on before, but we never cleaned it up. This should never happen.
+                    logmsg(LOG_ERR, "signals: Unable to clean-up terminated plugin '%s', exiting\n", p->name);
+                    _exit(-1);
+                }
                 goto success;
             }
         }
 
-        //A child died, but it wasn't a plugin. Dafuq?
-        logmsg(LOG_ERR, "signals: A child died, but was not a mapped plugin\n");
+        //A child died, but it wasn't a plugin. This should never happen.
+        logmsg(LOG_ERR, "signals: Child process (%d) died, but was not a mapped plugin\n", pid);
         _exit(-1);
 
         success:
@@ -104,15 +118,14 @@ int sigchld_handler(){
             //if we move to SUSv4, use strsignal() here
             logmsg(LOG_WARNING, "signals: Plugin '%s' terminated due to unhandled signal: %d\n", p->name, WTERMSIG(wstatus));
         }
-        else{
+        else if(WIFEXITED(wstatus)){
             logmsg(LOG_WARNING, "signals: Plugin '%s' exited with status: %d\n", p->name, WEXITSTATUS(wstatus));
         }
+        else{
+            logmsg(LOG_WARNING, "signals: Plugin '%s' was terminated via black magic\n", p->name);
+        }
 
-        watch_remove(p->sock);
-        htable_remove(rc_plugin_sock, (uint8_t*)&p->sock, sizeof(&p->sock));
-        close(p->sock);
-        p->pid = 0;
-        p->sock = -1;
+        p->pid = -1;
     }
 
     if(pid == -1){
@@ -120,8 +133,7 @@ int sigchld_handler(){
             //None of these should ever happen
             case EINTR:
             case EINVAL:
-                logmsg(LOG_ERR, "signal: %s\n", strerror(errno));
-                logmsg(LOG_ERR, "signal: Software failure. Press left mouse button to continue. Guru Meditation #b00b.b00b.b00b\n");
+                logmsg(LOG_ERR, "signal: Error on waitpid(), %s\n", strerror(errno));
                 _exit(-1);
         }
     }
